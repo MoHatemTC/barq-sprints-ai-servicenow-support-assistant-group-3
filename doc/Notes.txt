@@ -1,0 +1,14 @@
+Project: AI ServiceNow Support Assistant
+Sprint: BARQ G3 - Sprint 1 (S1.1) - Platform Administration & Security Governance
+Deliverable: Integration_Agent Configuration Note
+
+Note regarding the `snc_internal` role:
+---------------------------------------------------------------------
+As per the mentor's guidance:
+"snc_internal requires the Explicit Roles plugin (com.glide.explicit_roles), which we were instructed not to activate in our PDI to avoid potential system-wide ACL access disruptions."
+
+Accordingly, the Integration_Agent account has been provisioned following the least-privilege security standard using the required API role:
+- rest_service (Active)
+- snc_required_script_writer_permission (Inherited)
+- No admin privileges assigned.
+---------------------------------------------------------------------
