@@ -140,5 +140,17 @@ class ServiceNowClient:
                     "Skipping invalid Knowledge Base article: %s",
                     exc,
                 )
+            logger.info(
+            "Fetched Knowledge Base articles: %d",
+            len(articles),
+        )
+
+        for index, article in enumerate(articles, start=1):
+            logger.info(
+                "Article %d: %s - %s",
+                index,
+                article.number,
+                article.short_description,
+            )
 
         return articles
