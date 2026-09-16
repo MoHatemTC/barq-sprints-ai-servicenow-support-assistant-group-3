@@ -2,44 +2,38 @@
 BARQ G3 - Sprint 2 (S2.3) - Agent Tool Definitions
 AI ServiceNow Support Assistant
 
-The four tools the LangChain agent may invoke, backed by live
-ServiceNow integrations (no mocks).
+Defines the four LangChain-compatible tools the agent can invoke. This is
+strictly a definitions task: tool bodies here are mocks/stubs that return
+a dummy string, with no network calls and no dependency on how the caller
+passes incident context.
 
-The incident is preloaded into context by the caller (see
-servicenow/context.py), so there is no "fetch incident" tool.
+Deliberately NOT included in this sprint:
+  * Any real ServiceNow API call. Knowledge retrieval in this pipeline is
+    handled by the team's vector store (Qdrant), not ServiceNow keyword
+    search — wiring that up belongs to the sprint where retrieval
+    components merge, not here.
+  * Any ambient state (ContextVar, globals, etc.) for the current
+    incident. Keeping tool bodies pure/self-contained means a teammate
+    can import and call any tool directly with no setup and no
+    credentials, which matters for testing the agent loop in S2.4.
+
+The incident is preloaded into context by the caller, so there is no
+"fetch incident" tool here.
 
 STRUCTURAL GUARANTEE — no resolve / close / reassign:
-  1. Exactly four tools are exported in AGENT_TOOLS. There is no fifth.
-  2. None of the four takes state, close_code, assignment_group or
-     assigned_to as input — the schemas below simply have no field that
-     could carry such a value.
-  3. The only incident write path in the entire project is
-     ServiceNowClient.update_incident, which rejects every field outside
-     ALLOWED_INCIDENT_FIELDS (= {"work_notes"}) before sending a request.
-  So the exclusion holds even if a model tries to smuggle an instruction
-  through free text: there is no code path that can carry it out.
+Exactly four tools are exported in AGENT_TOOLS. None of the four input
+schemas has a field that could carry a resolve/close/reassign instruction
+(no state, close_code, assignment_group, or assigned_to field exists
+anywhere in this module) — so there is no code path, mocked or real,
+through which such an action could be requested.
 """
 
 from __future__ import annotations
 
-import logging
-from functools import lru_cache
 from typing import List
 
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
-
-from servicenow.client import ServiceNowClient
-from servicenow.context import get_current_incident
-
-logger = logging.getLogger(__name__)
-
-
-@lru_cache(maxsize=1)
-def _client() -> ServiceNowClient:
-    """Lazily build one shared client, so importing this module doesn't
-    require credentials to be present (useful in CI / for schema tests)."""
-    return ServiceNowClient()
 
 
 # ---------------------------------------------------------------------------
@@ -54,25 +48,10 @@ class KnowledgeBaseSearchInput(BaseModel):
 
 
 def _knowledge_base_search(query: str) -> str:
-    try:
-        articles = _client().search_knowledge(query)
-    except Exception as exc:  # surfaced to the agent, not raised into the loop
-        logger.exception("Knowledge base search failed")
-        return f"Knowledge base search failed: {exc}. Try rephrasing, or hand off for human review."
-
-    if not articles:
-        return (
-            f"No knowledge articles matched '{query}'. Try different wording, "
-            "or hand off for human review if the knowledge base has no coverage."
-        )
-
-    lines = []
-    for a in articles:
-        snippet = " ".join((a.get("snippet") or "").split())[:300]
-        lines.append(
-            f"[{a.get('number', 'n/a')}] {a.get('title', 'Untitled')}\n{snippet}"
-        )
-    return f"Found {len(articles)} article(s) for '{query}':\n\n" + "\n\n".join(lines)
+    """Stub. Real retrieval is handled by the Qdrant vector store in a
+    later sprint; this returns a placeholder so the tool contract can be
+    exercised end-to-end without that dependency."""
+    return f"[STUB] knowledge_base_search called with query='{query}'. No retrieval backend wired yet."
 
 
 knowledge_base_search_tool = StructuredTool.from_function(
@@ -103,13 +82,9 @@ class InternalWorkNoteInput(BaseModel):
 
 
 def _internal_work_note(note_text: str) -> str:
-    incident = get_current_incident()
-    try:
-        _client().add_work_note(incident.sys_id, note_text)
-    except Exception as exc:
-        logger.exception("Failed to add work note")
-        return f"Failed to record work note: {exc}. You may continue working."
-    return f"Work note recorded on {incident.number}."
+    """Stub. Real persistence (ServiceNow work_notes write) is deferred
+    to the sprint where components merge."""
+    return f"[STUB] internal_work_note called with note_text='{note_text}'. Not persisted."
 
 
 internal_work_note_tool = StructuredTool.from_function(
@@ -146,23 +121,9 @@ class FinalGroundedAnswerInput(BaseModel):
 def _final_grounded_answer(
     resolution_procedure: str, knowledge_article_references: List[str]
 ) -> str:
-    incident = get_current_incident()
+    """Stub. No network I/O — just formats and returns the terminal payload."""
     refs = ", ".join(knowledge_article_references)
-
-    # The answer is logged as a work note for traceability. It does NOT
-    # change incident state — the incident stays open for a human to act on.
-    try:
-        _client().add_work_note(
-            incident.sys_id,
-            f"[AI assistant — proposed answer]\n{resolution_procedure}\n\nSources: {refs}",
-        )
-    except Exception:
-        logger.exception("Failed to log final answer as work note")
-
-    return (
-        f"FINAL ANSWER for {incident.number}\n\n"
-        f"{resolution_procedure}\n\nSources: {refs}"
-    )
+    return f"[STUB] FINAL ANSWER — Procedure: {resolution_procedure} | Sources: {refs}"
 
 
 final_grounded_answer_tool = StructuredTool.from_function(
@@ -193,19 +154,8 @@ class HumanReviewHandoffInput(BaseModel):
 
 
 def _human_review_handoff(handoff_reason: str) -> str:
-    incident = get_current_incident()
-
-    # Hand-off = flagging for a human via a work note. It deliberately does
-    # not set assignment_group or assigned_to; routing stays a human decision.
-    try:
-        _client().add_work_note(
-            incident.sys_id,
-            f"[AI assistant — handed off for human review]\nReason: {handoff_reason}",
-        )
-    except Exception:
-        logger.exception("Failed to log hand-off as work note")
-
-    return f"HAND-OFF for {incident.number} — flagged for human review. Reason: {handoff_reason}"
+    """Stub. No network I/O — just formats and returns the terminal payload."""
+    return f"[STUB] HAND-OFF TO HUMAN REVIEW — Reason: {handoff_reason}"
 
 
 human_review_handoff_tool = StructuredTool.from_function(
