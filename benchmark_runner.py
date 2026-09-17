@@ -126,7 +126,6 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
     print(f"Avg Retrieval Latency:   {avg_latency:.2f} ms")
     print("="*45)
 
-# ENTRY POINT UPDATE: Fixed the double underscores so the CLI executes as intended
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run RAG Retrieval Benchmark")
     parser.add_argument("--dataset", type=str, default="incidents.json", help="Path to the JSON benchmark dataset")
