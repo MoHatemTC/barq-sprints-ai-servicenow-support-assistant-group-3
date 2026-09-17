@@ -83,7 +83,7 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
             rank = retrieved_articles.index(expected) + 1
             mrr_sum += 1.0 / rank
             
-        # PRINT UPDATE: Now displays the retrieved details containing both ID and Score
+        
         print(f"[{'PASS' if passed else 'FAIL'}] {inc['id']} | Expected: {expected} | Retrieved: {retrieved_details}")
 
     # Evaluate abstention
