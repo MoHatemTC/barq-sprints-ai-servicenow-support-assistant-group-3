@@ -3,16 +3,19 @@ from typing import Optional, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-# Default connection settings
-DEFAULT_QDRANT_URL = "https://b3a6cef6-30ae-4d87-9ba4-ab29bf647932.sa-east-1-0.aws.cloud.qdrant.io"
-DEFAULT_QDRANT_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIiwic3ViamVjdCI6ImFwaS1rZXk6ZDU0ODZhODctZTYwZi00YTg2LTg3MjktYzVlYWVhYjhkZTZhIn0.95m_XPtnLxqQeALJt8zKj2QnKJ839j1g63dJEtRPcz0"
 DEFAULT_THRESHOLD = 0.65
 
 
 def get_qdrant_client(url: Optional[str] = None, api_key: Optional[str] = None) -> QdrantClient:
+    qdrant_url = url or os.getenv("QDRANT_URL")
+    qdrant_api_key = api_key or os.getenv("QDRANT_API_KEY")
+
+    if not qdrant_url:
+        raise ValueError("QDRANT_URL is not set. Please define it in your environment or .env file.")
+
     return QdrantClient(
-        url=url or os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL),
-        api_key=api_key or os.getenv("QDRANT_API_KEY", DEFAULT_QDRANT_API_KEY)
+        url=qdrant_url,
+        api_key=qdrant_api_key
     )
 
 
@@ -53,7 +56,6 @@ def retrieve_relevant_chunks(
         )
         search_results = response.points
     except Exception:
-        # Fallback if server requires index for payload filtering
         response = client.query_points(
             collection_name=collection_name,
             query=query_vector,
@@ -69,7 +71,6 @@ def retrieve_relevant_chunks(
         else:
             search_results = all_points[:top_k]
 
-    # Handle case where no vectors match filter at all
     if not search_results:
         return {
             "status": "refused",
@@ -82,7 +83,6 @@ def retrieve_relevant_chunks(
 
     top_score = search_results[0].score
 
-    # Threshold gate evaluation
     if top_score < threshold:
         return {
             "status": "refused",
@@ -93,7 +93,6 @@ def retrieve_relevant_chunks(
             "results": []
         }
 
-    # Format successful results
     ranked_chunks = []
     for hit in search_results:
         payload = hit.payload or {}
