@@ -5,8 +5,30 @@ from typing import List, Dict, Any
 
 # Integration point for Qdrant Search Function
 def mock_semantic_search(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-    return [] 
-
+    """
+    MOCKED FOR PR REVIEW: Returns representative test scores to validate the 
+    Hit Rate and Abstention math until the live retrieval function is merged.
+    """
+    # Negative Control Mocks (Scores under 0.45)
+    if "grinding" in query: return [{"article_id": "KB0010011", "score": 0.31}]
+    if "monitor" in query: return [{"article_id": "KB0010032", "score": 0.25}]
+    if "expense" in query: return [{"article_id": "KB0010014", "score": 0.18}]
+    
+    # Answerable Incident Mocks (Scores between 0.75 - 0.88)
+    if "VPN" in query: return [{"article_id": "KB0010001", "score": 0.85}]
+    if "Outlook" in query: return [{"article_id": "KB0010003", "score": 0.82}]
+    if "shared drive" in query: return [{"article_id": "KB0010004", "score": 0.78}]
+    if "Jobs queue" in query: return [{"article_id": "KB0010011", "score": 0.81}]
+    if "locked out" in query: return [{"article_id": "KB0010014", "score": 0.76}]
+    if "authenticator" in query: return [{"article_id": "KB0010015", "score": 0.79}]
+    if "Windows update" in query: return [{"article_id": "KB0010012", "score": 0.84}]
+    if "SAP" in query: return [{"article_id": "KB0010013", "score": 0.88}]
+    if "5 GHz" in query: return [{"article_id": "KB0010017", "score": 0.77}]
+    if "Order service" in query: return [{"article_id": "KB0010016", "score": 0.83}]
+    if "OSPF" in query: return [{"article_id": "KB0010018", "score": 0.81}]
+    if "latency" in query: return [{"article_id": "KB0010020", "score": 0.75}]
+    
+    return []
 def calculate_optimal_threshold(valid_scores: List[float], negative_scores: List[float]) -> float:
     """
     Calculates the optimal similarity threshold to separate valid hits from noise.
@@ -128,7 +150,7 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run RAG Retrieval Benchmark")
-    parser.add_argument("--dataset", type=str, default="incidents.json", help="Path to the JSON benchmark dataset")
+    parser.add_argument("--dataset", type=str, default="Benchmark_Dataset.json", help="Path to the JSON benchmark dataset")
     parser.add_argument("--threshold", type=float, default=0.55, help="Similarity score threshold")
     parser.add_argument("--top_k", type=int, default=3, help="Number of chunks to retrieve")
     
