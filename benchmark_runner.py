@@ -29,6 +29,7 @@ def mock_semantic_search(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
     if "latency" in query: return [{"article_id": "KB0010020", "score": 0.75}]
     
     return []
+
 def calculate_optimal_threshold(valid_scores: List[float], negative_scores: List[float]) -> float:
     """
     Calculates the optimal similarity threshold to separate valid hits from noise.
@@ -81,7 +82,14 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
     print(">>> Evaluating Answerable Incidents")
     for inc in answerable:
         start_time = time.time()
-        results = mock_semantic_search(inc["query"], top_k=top_k)
+        
+        # DEFENSIVE EXCEPTION HANDLING ADDED HERE
+        try:
+            results = mock_semantic_search(inc["query"], top_k=top_k)
+        except Exception as e:
+            print(f"  [ERROR] Retrieval failed for {inc['id']}: {e}")
+            results = []
+            
         total_latency += (time.time() - start_time)
         
         results = sorted(results, key=lambda x: x.get("score", 0.0), reverse=True)
@@ -95,7 +103,6 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
         # Standard threshold check
         valid_results = [res for res in results if res.get("score", 0.0) >= threshold]
         
-        # FORMAT UPDATE: Append the score alongside the article ID for the print output
         retrieved_details = [f"{res.get('article_id')} ({res.get('score', 0.0):.2f})" for res in valid_results]
         retrieved_articles = [res.get("article_id") for res in valid_results]
 
@@ -105,14 +112,20 @@ def run_benchmark(dataset_path: str, threshold: float = 0.55, top_k: int = 3):
             rank = retrieved_articles.index(expected) + 1
             mrr_sum += 1.0 / rank
             
-        
         print(f"[{'PASS' if passed else 'FAIL'}] {inc['id']} | Expected: {expected} | Retrieved: {retrieved_details}")
 
     # Evaluate abstention
     print("\n>>> Evaluating Negative Controls (Refusals)")
     for inc in negative_controls:
         start_time = time.time()
-        results = mock_semantic_search(inc["query"], top_k=top_k)
+        
+        # DEFENSIVE EXCEPTION HANDLING ADDED HERE
+        try:
+            results = mock_semantic_search(inc["query"], top_k=top_k)
+        except Exception as e:
+            print(f"  [ERROR] Retrieval failed for {inc['id']}: {e}")
+            results = []
+            
         total_latency += (time.time() - start_time)
         
         results = sorted(results, key=lambda x: x.get("score", 0.0), reverse=True)
