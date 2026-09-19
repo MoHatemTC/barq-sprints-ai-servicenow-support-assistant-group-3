@@ -1,0 +1,84 @@
+{
+  "answerable_incidents": [
+    {
+      "id": "INC_TEST_001",
+      "query": "Cannot connect to VPN since password reset this morning. Client says invalid credentials.",
+      "expected_article": "KB0010001"
+    },
+    {
+      "id": "INC_TEST_002",
+      "query": "Outlook says Disconnected and no mail has arrived since 08:00.",
+      "expected_article": "KB0010003"
+    },
+    {
+      "id": "INC_TEST_003",
+      "query": "The shared drive that was mapped yesterday is gone after I signed in.",
+      "expected_article": "KB0010004"
+    },
+    {
+      "id": "INC_TEST_004",
+      "query": "Jobs queue up and nothing comes out of the printer.",
+      "expected_article": "KB0010011"
+    },
+    {
+      "id": "INC_TEST_005",
+      "query": "I am locked out and nothing lets me sign in. It affects my email and shared drives.",
+      "expected_article": "KB0010014"
+    },
+    {
+      "id": "INC_TEST_006",
+      "query": "I changed my phone and my MFA authenticator no longer works.",
+      "expected_article": "KB0010015"
+    },
+    {
+      "id": "INC_TEST_007",
+      "query": "My laptop has been very slow since the Windows update.",
+      "expected_article": "KB0010012"
+    },
+    {
+      "id": "INC_TEST_008",
+      "query": "SAP times out with RFC_ERROR_COMMUNICATION.",
+      "expected_article": "KB0010013"
+    },
+    {
+      "id": "INC_TEST_009",
+      "query": "Wi-Fi keeps dropping on the 5 GHz corporate network when I walk between floors.",
+      "expected_article": "KB0010017"
+    },
+    {
+      "id": "INC_TEST_010",
+      "query": "Order service is returning HTTP 500s under load. Logs show pool saturation.",
+      "expected_article": "KB0010016"
+    },
+    {
+      "id": "INC_TEST_011",
+      "query": "OSPF Area 0 failover did not trigger during the primary link outage. Neighbor state is stuck in INIT.",
+      "expected_article": "KB0010018"
+    },
+    {
+      "id": "INC_TEST_012",
+      "query": "High latency and packet drops observed on the 10G uplink between core data center switches.",
+      "expected_article": "KB0010020"
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "INC_NEG_001",
+      "query": "There is a grinding noise on the paper feed of the meeting room printer.",
+      "expected_article": null,
+      "reason": "Mechanical hardware fault, requires Facilities."
+    },
+    {
+      "id": "INC_NEG_002",
+      "query": "Please order me a second monitor for my desk.",
+      "expected_article": null,
+      "reason": "Service request, not an IT incident."
+    },
+    {
+      "id": "INC_NEG_003",
+      "query": "When will my expense claim be paid?",
+      "expected_article": null,
+      "reason": "HR/Finance inquiry, no IT knowledge base article exists."
+    }
+  ]
+}
