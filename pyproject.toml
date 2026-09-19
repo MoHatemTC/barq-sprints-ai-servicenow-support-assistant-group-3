@@ -1,5 +1,5 @@
 [project]
-name = "task2"
+name = "barq-sprints-ai-servicenow-support-assistant-group-3"
 version = "0.1.0"
 description = "Add your description here"
 authors = [
@@ -7,6 +7,8 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langchain-core>=0.3.0",
+    "pydantic>=2.0",
     "beautifulsoup4>=4.15.0",
     "google-genai>=2.24.0",
     "httpx>=0.28.1",
