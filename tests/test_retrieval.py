@@ -66,10 +66,9 @@ def test_retrieval_meets_threshold(client, sample):
         threshold=0.70,
         client=client,
     )
-    assert result["status"] in ("success", "refused")
-    if result["status"] == "success":
-        assert result["results"], "success must include results"
-        assert result["top_score"] >= 0.70
+    assert result["status"] == "success"
+    assert result["results"], "success must include results"
+    assert result["top_score"] >= 0.70
 
 
 def test_refusal_gate_when_below_threshold(client, sample):
