@@ -7,7 +7,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langchain>=0.3.0",
     "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
     "pydantic>=2.0",
     "beautifulsoup4>=4.15.0",
     "google-genai>=2.24.0",
