@@ -5,8 +5,8 @@ from typing import List, Dict
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
-from config import settings
-from embedder import EMBEDDING_DIMENSION
+from barq_support.config import settings
+from barq_support.ingestion.embedder import EMBEDDING_DIMENSION
  
 COLLECTION_NAME = "kb_articles" 
 VECTOR_SIZE = EMBEDDING_DIMENSION # 3072 for Gemini Embedding 2 

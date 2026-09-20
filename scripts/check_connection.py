@@ -3,7 +3,7 @@ Live connection check against the team's ServiceNow instance.
 
 Run this FIRST, before anything else:
 
-    python PoCs/check_connection.py
+    python scripts/check_connection.py
 
 It verifies, in order:
   1. env vars are present,
@@ -28,7 +28,7 @@ try:
 except ImportError:
     pass
 
-from servicenow.client import (  # noqa: E402
+from barq_support.servicenow.client import (  # noqa: E402
     ServiceNowClient,
     ServiceNowConfigError,
     ForbiddenFieldError,

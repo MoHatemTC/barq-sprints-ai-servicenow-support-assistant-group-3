@@ -3,15 +3,15 @@
 import re
 import unittest
 
-from support_agent.formatting import (
+from barq_support.agent.formatting import (
     escape_untrusted,
     format_incident_block,
     format_knowledge_block,
     render_user_message,
 )
-from support_agent.mock_data import INCIDENT_INJECTION, INCIDENT_VPN, KB_VPN_809
-from support_agent.models import KnowledgeChunk, normalize_chunks
-from support_agent.prompts import DECLINE_MESSAGE, SYSTEM_PROMPT
+from barq_support.agent.mock_data import INCIDENT_INJECTION, INCIDENT_VPN, KB_VPN_809
+from barq_support.agent.models import KnowledgeChunk, normalize_chunks
+from barq_support.agent.prompts import DECLINE_MESSAGE, SYSTEM_PROMPT
 
 
 class SystemPromptRequirements(unittest.TestCase):

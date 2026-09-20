@@ -1,7 +1,7 @@
 import uuid
 from unittest.mock import MagicMock
 
-import qdrant_store
+import barq_support.ingestion.qdrant_store as qdrant_store
 
 
 def make_chunk(article_id="KB01", section="Problem", chunk_index=0, text="hello", metadata=None):

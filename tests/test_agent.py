@@ -7,10 +7,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from support_agent.agent import generate_recommendation
-from support_agent.config import ConfigError, Settings
-from support_agent.mock_data import INCIDENT_SAP, INCIDENT_VPN, KB_VPN_809
-from support_agent.prompts import DECLINE_TEXT
+from barq_support.agent.agent import generate_recommendation
+from barq_support.agent.settings import ConfigError, Settings
+from barq_support.agent.mock_data import INCIDENT_SAP, INCIDENT_VPN, KB_VPN_809
+from barq_support.agent.prompts import DECLINE_TEXT
 
 HAS_LANGCHAIN = all(
     importlib.util.find_spec(m) for m in ("langchain", "langchain_core", "langchain_openai")
@@ -62,7 +62,7 @@ class ConfigFromEnvironment(unittest.TestCase):
 
     def test_no_hardcoded_secrets_or_endpoints_in_source(self):
         pattern = re.compile(r"sk-[A-Za-z0-9_-]{16,}|https?://api\.[a-z]+\.(com|ai)", re.I)
-        for path in list((ROOT / "support_agent").glob("*.py")) + list((ROOT / "scripts").glob("*.py")):
+        for path in list((ROOT / "src" / "barq_support" / "agent").glob("*.py")) + list((ROOT / "scripts").glob("*.py")):
             self.assertIsNone(pattern.search(path.read_text()), f"hardcoded secret/endpoint in {path}")
 
 
@@ -81,9 +81,9 @@ class ExecutorLoopOffline(unittest.TestCase):
         return FakeToolModel(responses=responses)
 
     def test_prompt_message_order_is_system_then_knowledge_then_incident(self):
-        from support_agent.formatting import format_incident_block, format_knowledge_block
-        from support_agent.models import normalize_chunks
-        from support_agent.prompts import build_prompt
+        from barq_support.agent.formatting import format_incident_block, format_knowledge_block
+        from barq_support.agent.models import normalize_chunks
+        from barq_support.agent.prompts import build_prompt
 
         msgs = build_prompt().format_messages(
             knowledge_block=format_knowledge_block(normalize_chunks([KB_VPN_809])),
@@ -122,8 +122,8 @@ class ExecutorLoopOffline(unittest.TestCase):
         self.assertEqual(r.status, "DECLINED")
 
     def test_scoped_tool_refuses_unretrieved_article_and_no_mutating_tools_exist(self):
-        from support_agent.models import normalize_chunks
-        from support_agent.tools import build_tools
+        from barq_support.agent.models import normalize_chunks
+        from barq_support.agent.scoped_tools import build_tools
 
         tools = {t.name: t for t in build_tools(normalize_chunks([KB_VPN_809]))}
         self.assertIn("not among the retrieved", tools["get_kb_article"].invoke({"article_number": "KB0099999"}))

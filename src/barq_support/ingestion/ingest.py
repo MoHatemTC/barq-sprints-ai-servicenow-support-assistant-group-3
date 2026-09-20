@@ -1,11 +1,11 @@
 import httpx
 from typing import List, Dict
 
-from chunker import chunk_article
-from embedder import embed_texts, EMBEDDING_BATCH_SIZE
-from qdrant_store import get_client, ensure_collection, upsert_chunks
-from config import settings
-from embedding_cache import load_cache, save_embedding, get_embedding
+from barq_support.ingestion.chunker import chunk_article
+from barq_support.ingestion.embedder import embed_texts, EMBEDDING_BATCH_SIZE
+from barq_support.ingestion.qdrant_store import get_client, ensure_collection, upsert_chunks
+from barq_support.config import settings
+from barq_support.ingestion.embedding_cache import load_cache, save_embedding, get_embedding
 
 
 ARTICLES_ENDPOINT = "http://localhost:8000/kb-articles"

@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
-from retriever import retrieve_relevant_chunks
+from barq_support.retrieval.retriever import retrieve_relevant_chunks
 
 # Load environment variables from .env file
 load_dotenv()
