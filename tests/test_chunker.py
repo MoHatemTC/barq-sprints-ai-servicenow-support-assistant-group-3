@@ -1,6 +1,6 @@
 import pytest
 
-from chunker import chunk_article, extract_sections, split_by_length
+from barq_support.ingestion.chunker import chunk_article, extract_sections, split_by_length
 
 
 class TestSplitByLength:

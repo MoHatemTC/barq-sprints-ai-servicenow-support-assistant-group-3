@@ -7,7 +7,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langchain>=0.3.0",
     "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
     "pydantic>=2.0",
     "beautifulsoup4>=4.15.0",
     "google-genai>=2.24.0",
@@ -18,12 +20,17 @@ dependencies = [
     "sentence-transformers>=6.0.1",
 ]
 
-[project.scripts]
-task2 = "task2:main"
-
 [build-system]
 requires = ["uv_build>=0.12.12,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "barq_support"
+module-root = "src"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
 
 [dependency-groups]
 dev = [

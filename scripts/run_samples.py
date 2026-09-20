@@ -17,11 +17,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from support_agent.agent import generate_recommendation  # noqa: E402
-from support_agent.config import Settings  # noqa: E402
-from support_agent.formatting import format_incident_block, format_knowledge_block  # noqa: E402
-from support_agent.mock_data import SCENARIOS  # noqa: E402
-from support_agent.models import normalize_chunks  # noqa: E402
+from barq_support.agent.agent import generate_recommendation  # noqa: E402
+from barq_support.agent.settings import Settings  # noqa: E402
+from barq_support.agent.formatting import format_incident_block, format_knowledge_block  # noqa: E402
+from barq_support.agent.mock_data import SCENARIOS  # noqa: E402
+from barq_support.agent.models import normalize_chunks  # noqa: E402
 
 OUT = ROOT / "docs" / "sample_runs.md"
 

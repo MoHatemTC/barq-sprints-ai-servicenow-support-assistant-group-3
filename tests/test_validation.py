@@ -2,8 +2,8 @@
 
 import unittest
 
-from support_agent.prompts import DECLINE_TEXT
-from support_agent.validation import validate_output
+from barq_support.agent.prompts import DECLINE_TEXT
+from barq_support.agent.validation import validate_output
 
 KNOWN = {"KB0010234", "KB0010301"}
 

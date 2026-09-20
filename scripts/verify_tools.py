@@ -11,7 +11,7 @@ Asserts:
   * no tool's input schema could carry a resolve/close/reassign field,
   * each tool can be invoked directly with a sample payload (mocked body).
 
-Run with: python PoCs/verify_tools.py
+Run with: python scripts/verify_tools.py
 """
 
 import os
@@ -19,7 +19,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from tools.agent_tools import AGENT_TOOLS, REPEATABLE_TOOLS, TERMINAL_TOOLS  # noqa: E402
+from barq_support.agent.tools import AGENT_TOOLS, REPEATABLE_TOOLS, TERMINAL_TOOLS  # noqa: E402
 
 FORBIDDEN_SCHEMA_FIELDS = {
     "state", "incident_state", "close_code", "close_notes",

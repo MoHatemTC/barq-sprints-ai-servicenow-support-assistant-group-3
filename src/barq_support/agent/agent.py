@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterable, Mapping
 
-from .config import Settings
+from .settings import Settings
 from .formatting import format_incident_block, format_knowledge_block
 from .models import AgentResult, KnowledgeChunk, normalize_chunks
 from .prompts import DECLINE_TEXT
