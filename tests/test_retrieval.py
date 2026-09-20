@@ -1,80 +1,103 @@
+"""Retrieval gate tests against the live Qdrant collection.
+
+Skipped automatically when QDRANT_URL is not configured or the cluster is
+unreachable, so `uv run pytest` works offline for everyone else.
+"""
+
 import os
+
+import pytest
 from dotenv import load_dotenv
-from qdrant_client import QdrantClient
+
 from barq_support.retrieval.retriever import retrieve_relevant_chunks
 
-# Load environment variables from .env file
 load_dotenv()
-
-print("=== Starting Retrieval Gate Tests ===")
 
 qdrant_url = os.getenv("QDRANT_URL")
 qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
-if not qdrant_url:
-    print("Error: QDRANT_URL environment variable is missing. Check your .env file.")
-    exit(1)
 
-client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+def _reachable() -> bool:
+    if not qdrant_url:
+        return False
+    try:
+        from qdrant_client import QdrantClient
 
-# 1. Fetch sample point
-points, _ = client.scroll(
-    collection_name="kb_articles",
-    limit=1,
-    with_payload=True,
-    with_vectors=True
+        client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=5)
+        client.get_collections()
+        return True
+    except Exception:
+        return False
+
+
+QDRANT_AVAILABLE = _reachable()
+
+pytestmark = pytest.mark.skipif(
+    not QDRANT_AVAILABLE,
+    reason="live Qdrant not reachable (set QDRANT_URL/QDRANT_API_KEY to run)",
 )
 
-if not points:
-    print("No points found in collection.")
-    exit()
+COLLECTION = "kb_articles"
 
-sample_point = points[0]
-sample_vector = sample_point.vector
-sample_text = sample_point.payload.get("text", "")[:60]
 
-# Test 1: Successful retrieval
-print("\n--- Test 1: Query Meeting Threshold (Success) ---")
-result_success = retrieve_relevant_chunks(
-    query_vector=sample_vector,
-    query_text=sample_text,
-    collection_name="kb_articles",
-    top_k=2,
-    threshold=0.70,
-    client=client
-)
-print("Status:", result_success["status"])
-print("Top Score:", result_success["top_score"])
-print("Retrieved Chunks Count:", len(result_success["results"]))
-if result_success["results"]:
-    print("Top Article ID:", result_success["results"][0]["article_id"])
+@pytest.fixture(scope="module")
+def client():
+    from qdrant_client import QdrantClient
 
-# Test 2: Refusal Gate
-print("\n--- Test 2: Threshold Gate Triggered (Refusal) ---")
-result_refused = retrieve_relevant_chunks(
-    query_vector=sample_vector,
-    query_text=sample_text,
-    collection_name="kb_articles",
-    top_k=2,
-    threshold=1.05,
-    client=client
-)
-print("Status:", result_refused["status"])
-print("Message:", result_refused["message"])
-print("Searched Query:", result_refused["searched_query"])
-print("Top Score:", result_refused["top_score"])
-print("Threshold:", result_refused["threshold"])
+    return QdrantClient(url=qdrant_url, api_key=qdrant_api_key, timeout=15)
 
-# Test 3: Category Filtering
-print("\n--- Test 3: Category Filtering ---")
-result_category = retrieve_relevant_chunks(
-    query_vector=sample_vector,
-    query_text=sample_text,
-    collection_name="kb_articles",
-    top_k=2,
-    category="NonExistingCategory123",
-    threshold=0.50,
-    client=client
-)
-print("Status:", result_category["status"])
-print("Message:", result_category["message"])
+
+@pytest.fixture(scope="module")
+def sample(client):
+    points, _ = client.scroll(collection_name=COLLECTION, limit=1, with_payload=True, with_vectors=True)
+    if not points:
+        pytest.skip("collection kb_articles has no points")
+    p = points[0]
+    return p.vector, p.payload.get("text", "")[:60]
+
+
+def test_retrieval_meets_threshold(client, sample):
+    vector, text = sample
+    result = retrieve_relevant_chunks(
+        query_vector=vector,
+        query_text=text,
+        collection_name=COLLECTION,
+        top_k=2,
+        threshold=0.70,
+        client=client,
+    )
+    assert result["status"] in ("success", "refused")
+    if result["status"] == "success":
+        assert result["results"], "success must include results"
+        assert result["top_score"] >= 0.70
+
+
+def test_refusal_gate_when_below_threshold(client, sample):
+    vector, text = sample
+    result = retrieve_relevant_chunks(
+        query_vector=vector,
+        query_text=text,
+        collection_name=COLLECTION,
+        top_k=2,
+        threshold=1.05,  # impossible score -> guaranteed refusal
+        client=client,
+    )
+    assert result["status"] == "refused"
+    assert result["results"] == []
+    assert result["top_score"] < 1.05
+
+
+def test_category_filter_returns_no_unknown_articles(client, sample):
+    vector, text = sample
+    result = retrieve_relevant_chunks(
+        query_vector=vector,
+        query_text=text,
+        collection_name=COLLECTION,
+        top_k=2,
+        category="NonExistingCategory123",
+        threshold=0.50,
+        client=client,
+    )
+    assert result["status"] in ("success", "refused")
+    for chunk in result["results"]:
+        assert chunk["category"] == "NonExistingCategory123"
