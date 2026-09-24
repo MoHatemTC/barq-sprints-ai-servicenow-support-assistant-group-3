@@ -7,10 +7,6 @@ from ..servicenow import ServiceNowClient
 from ..retrieval.retriever import search_kb
 
 
-# ---------------------------------------------------------------------------
-# Tool input schemas
-# ---------------------------------------------------------------------------
-
 class SearchKBInput(BaseModel):
     query: str = Field(
         ...,
@@ -53,23 +49,12 @@ class RequestHRInput(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
-# Tool registry
-# ---------------------------------------------------------------------------
-
 def build_tools(
     servicenow: ServiceNowClient,
     incident_sys_id: str,
     qdrant_client,
 ) -> tuple[list[StructuredTool], list[StructuredTool]]:
-    """
-    Build the four tools available to the agent for one incident.
 
-    Returns:
-        repeatable_tools, terminal_tools
-    """
-
-    # Sources retrieved during this agent execution.
     retrieved_sources: set[str] = set()
     retrieved_article_ids: set[str] = set()
 
@@ -79,6 +64,21 @@ def build_tools(
             client=qdrant_client,
         )
 
+        # Demo evidence: show the actual chunks returned by Qdrant.
+        print("\n" + "=" * 70)
+        print("SEARCHKB RETURNED CHUNKS")
+        print("=" * 70)
+
+        for index, result in enumerate(results, start=1):
+            print(f"\nChunk {index}")
+            print(f"Score:       {result.get('score')}")
+            print(f"Article ID:  {result.get('article_id')}")
+            print(f"Section:     {result.get('section')}")
+            print(f"Chunk Index: {result.get('chunk_index')}")
+            print(f"Category:    {result.get('category')}")
+            print(f"Text:        {result.get('text', '')}")
+
+        # Track sources returned during this execution.
         for result in results:
             article_id = result.get("article_id")
             chunk_index = result.get("chunk_index")
@@ -89,6 +89,7 @@ def build_tools(
                     if chunk_index is not None
                     else str(article_id)
                 )
+
                 retrieved_sources.add(source_id)
                 retrieved_article_ids.add(str(article_id))
 
@@ -105,16 +106,24 @@ def build_tools(
         sources: List[str],
         confidence: float,
     ) -> dict:
-        normalized_sources = {source.strip() for source in sources}
 
-        if not all( source in retrieved_sources or source in retrieved_article_ids for source in normalized_sources):
-           raise ValueError(
-        "suggestAnswer sources must come from searchKB results retrieved during this execution."
-    )
+        normalized_sources = {
+            source.strip()
+            for source in sources
+        }
+
+        if not all(
+            source in retrieved_sources
+            or source in retrieved_article_ids
+            for source in normalized_sources
+        ):
+            raise ValueError(
+                "suggestAnswer sources must come from "
+                "searchKB results retrieved during this execution."
+            )
 
         response = (
-            f"{procedure}\n\n"
-            f"Sources:\n"
+            f"{procedure}\n\nSources:\n"
             + "\n".join(f"- {source}" for source in sources)
         )
 
@@ -134,8 +143,8 @@ def build_tools(
         func=search_kb_tool,
         name="searchKB",
         description=(
-            "Search the ServiceNow knowledge base using dense vector "
-            "retrieval. This tool is repeatable and non-terminal."
+            "Search the ServiceNow knowledge base using dense vector retrieval. "
+            "This tool is repeatable and non-terminal."
         ),
         args_schema=SearchKBInput,
     )
@@ -173,7 +182,4 @@ def build_tools(
         return_direct=True,
     )
 
-    repeatable_tools = [search_tool, work_note_tool]
-    terminal_tools = [suggest_tool, hr_tool]
-
-    return repeatable_tools, terminal_tools
+    return [search_tool, work_note_tool], [suggest_tool, hr_tool]
