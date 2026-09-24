@@ -1,8 +1,28 @@
 [project]
-name = "barq-sprints-ai-servicenow-support-assistant-group-3"
+name = "task3"
 version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Malak Rabie", email = "158449620+malakmrabie@users.noreply.github.com" }
+]
 requires-python = ">=3.11"
 dependencies = [
-    "langchain-core>=0.3.0",
-    "pydantic>=2.0",
+    "google-genai>=2.25.0",
+    "httpx>=0.28.1",
+    "langchain>=1.4.2",
+    "langchain-core>=1.6.4",
+    "langchain-google-genai>=4.4.0",
+    "langchain-openai>=1.6.5",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "qdrant-client>=1.19.1",
 ]
+
+[project.scripts]
+task3 = "task3:main"
+
+[build-system]
+requires = ["uv_build>=0.12.12,<0.13.0"]
+build-backend = "uv_build"
