@@ -2,7 +2,7 @@
 """
 scripts/ingest_pdf.py
 Hybrid Pipeline: Unstructured (YOLOX/Tesseract) for corrupted text/tables + Custom Vector Heuristics for Flowcharts.
-Includes deterministic UUIDv5 generation and explicit provenance metadata stamping.
+Includes deterministic UUIDv5 generation, explicit provenance metadata stamping, and pre-OCR orientation correction.
 """
 
 import argparse
@@ -10,12 +10,14 @@ import base64
 import hashlib
 import io
 import os
+import re
 import sys
 import uuid
 
 from dotenv import load_dotenv
 import pymupdf as fitz
 import pdfplumber
+import pytesseract
 from PIL import Image
 
 from langchain_core.documents import Document
@@ -27,6 +29,38 @@ from openai import OpenAI
 
 # Fixed namespace for generating deterministic UUIDv5 keys
 NAMESPACE_PDF = uuid.UUID("6f8f2c2a-6f1b-4b2a-9b3e-1f0a2b7c9d10")
+
+def correct_pdf_orientation(pdf_path: str) -> str:
+    """
+    Detects skewed/rotated pages using Tesseract OSD, rotates them upright,
+    and saves a temporary corrected PDF so Unstructured and PDFPlumber read it cleanly.
+    """
+    print("[*] Pre-processing: Checking and correcting page orientations...")
+    doc = fitz.open(pdf_path)
+    needs_correction = False
+    
+    for page in doc:
+        pix = page.get_pixmap(dpi=150)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        try:
+            osd = pytesseract.image_to_osd(img)
+            match = re.search(r"Rotate:\s*(\d+)", osd)
+            angle = int(match.group(1)) if match else 0
+            if angle != 0:
+                print(f"    - Correcting page {page.number + 1} (Rotated {angle} degrees)")
+                page.set_rotation(angle)
+                needs_correction = True
+        except pytesseract.pytesseract.TesseractError:
+            pass # Skip if OSD fails on sparse pages
+            
+    if needs_correction:
+        temp_path = f"oriented_temp_{os.path.basename(pdf_path)}"
+        doc.save(temp_path)
+        doc.close()
+        return temp_path
+    
+    doc.close()
+    return pdf_path
 
 def summarize_figure(client: OpenAI, model: str, pil_image: Image.Image) -> str | None:
     buf = io.BytesIO()
@@ -97,12 +131,15 @@ def main():
     args = parser.parse_args()
 
     if not os.path.exists(args.pdf_path): sys.exit(1)
-    filename = os.path.basename(args.pdf_path)
+    original_filename = os.path.basename(args.pdf_path)
     
-    # 1. Base Parsing with Unstructured (Handles RTL Arabic and Tables via YOLOX/Tesseract)
+    # 0. Orientation Pre-Processing
+    processed_pdf_path = correct_pdf_orientation(args.pdf_path)
+    
+    # 1. Base Parsing with Unstructured
     print(f"[*] Parsing text and tables via Unstructured (hi_res)...")
     loader = UnstructuredPDFLoader(
-        args.pdf_path,
+        processed_pdf_path,
         strategy="hi_res",
         languages=["eng", "ara"],
         mode="elements"
@@ -114,7 +151,7 @@ def main():
         if doc.metadata.get("category") == "Table" and "text_as_html" in doc.metadata:
             doc.page_content = doc.metadata["text_as_html"]
         doc.metadata["chunk_type"] = doc.metadata.get("category", "text").lower()
-        doc.metadata["source_document"] = filename
+        doc.metadata["source_document"] = original_filename
         docs.append(doc)
     
     # 2. Supplementary Parsing
@@ -122,7 +159,11 @@ def main():
     vision_client = OpenAI(api_key=os.getenv("LLM_API_KEY"), base_url=os.getenv("LLM_BASE_URL")) if os.getenv("LLM_API_KEY") else None
     
     if vision_client:
-        docs.extend(extract_vector_flowcharts(args.pdf_path, vision_client, vision_model))
+        docs.extend(extract_vector_flowcharts(processed_pdf_path, vision_client, vision_model))
+
+    # Cleanup temporary oriented PDF if created
+    if processed_pdf_path != args.pdf_path and os.path.exists(processed_pdf_path):
+        os.remove(processed_pdf_path)
 
     # 3. Chunking
     print("[*] Splitting text (Size: 700, Overlap: 120)...")
@@ -133,24 +174,21 @@ def main():
     print("[*] Stamping provenance metadata and generating UUIDv5 deterministic IDs...")
     deterministic_ids = []
     for chunk in chunks:
-        # Explicitly stamp required provenance payload
         chunk.metadata["source_type"] = "pdf"
         
         page_num = chunk.metadata.get("page_number", 0)
         chunk_type = chunk.metadata.get("chunk_type", "text")
         content_hash = hashlib.sha256(chunk.page_content.encode("utf-8")).hexdigest()
         
-        # Derive idempotent ID: filename + page + type + hash
-        deterministic_key = f"{filename}::{page_num}::{chunk_type}::{content_hash}"
+        deterministic_key = f"{original_filename}::{page_num}::{chunk_type}::{content_hash}"
         chunk_id = str(uuid.uuid5(NAMESPACE_PDF, deterministic_key))
         deterministic_ids.append(chunk_id)
         
-        # Keep hash in metadata for observability
         chunk.metadata["content_hash"] = content_hash
 
     # Output to markdown for inspection
     with open("inspection_output.md", "w", encoding="utf-8") as f:
-        f.write(f"# Extracted Chunks: {filename}\n\n")
+        f.write(f"# Extracted Chunks: {original_filename}\n\n")
         for idx, c in enumerate(chunks):
             f.write(f"### Chunk {idx + 1} [ID: {deterministic_ids[idx][:8]}... | page {c.metadata.get('page_number', 'unknown')}]\n\n{c.page_content}\n\n---\n\n")
 
@@ -175,7 +213,7 @@ def main():
         url=qdrant_url,
         api_key=qdrant_api_key,
         collection_name=collection_name,
-        ids=deterministic_ids, # Prevents duplicate vectors on re-run
+        ids=deterministic_ids,
         force_recreate=False
     )
     print("[+] Ingestion successful. Re-running will safely overwrite existing points.")
