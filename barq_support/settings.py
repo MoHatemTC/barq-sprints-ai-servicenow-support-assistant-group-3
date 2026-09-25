@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     qdrant_url: str = Field(default="")
     qdrant_api_key: str = Field(default="")
     qdrant_collection: str = Field(default="kb_articles")
+    
+    #langfuse
+    langfuse_public_key: str = Field(default="")
+    langfuse_secret_key: str = Field(default="")
+    langfuse_host: str = Field(default="https://cloud.langfuse.com")
 
     # Agent
     agent_max_iterations: int = Field(default=5)

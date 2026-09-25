@@ -4,6 +4,8 @@ from typing import Any
 
 from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langfuse import Langfuse, get_client
+from langfuse.langchain import CallbackHandler
 
 from ..settings import Settings
 from .middleware import ExecutionGuardMiddleware, S3AgentState
@@ -62,6 +64,22 @@ def run_agent(
         max_iterations=settings.agent_max_iterations,
     )
 
+    # Initialize the Langfuse client so the LangChain callback
+    # can record the agent and tool-call traces.
+    Langfuse(
+        public_key=settings.langfuse_public_key,
+        secret_key=settings.langfuse_secret_key,
+        host=settings.langfuse_host,
+    )
+
+    langfuse_client = get_client(
+        public_key=settings.langfuse_public_key,
+    )
+
+    langfuse_handler = CallbackHandler(
+        public_key=settings.langfuse_public_key,
+    )
+
     result = agent.invoke(
         {
             "messages": [
@@ -87,7 +105,8 @@ def run_agent(
                     ),
                 }
             ]
-        }
+        },
+        config={"callbacks": [langfuse_handler]},
     )
 
     # Fail-safe: if the bounded agent loop ends without
@@ -97,7 +116,8 @@ def run_agent(
         False,
     ):
         hr_tool = next(
-            tool for tool in terminal_tools
+            tool
+            for tool in terminal_tools
             if tool.name == "requestHR"
         )
 
@@ -111,5 +131,8 @@ def run_agent(
         )
 
         result["s3_terminal_called"] = True
+
+    # Ensure pending Langfuse traces are sent before returning.
+    langfuse_client.flush()
 
     return result
