@@ -1,0 +1,38 @@
+[project]
+name = "barq-sprints-ai-servicenow-support-assistant-group-3"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Malak Rabie", email = "158449620+malakmrabie@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "pydantic>=2.0",
+    "beautifulsoup4>=4.15.0",
+    "google-genai>=2.24.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "qdrant-client>=1.19.1",
+    "sentence-transformers>=6.0.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.12,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "barq_support"
+module-root = "src"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
