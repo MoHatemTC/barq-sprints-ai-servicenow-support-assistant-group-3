@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-DEFAULT_THRESHOLD = 0.65
+DEFAULT_THRESHOLD = 0.74
 
 
 def get_qdrant_client(url: Optional[str] = None, api_key: Optional[str] = None) -> QdrantClient:

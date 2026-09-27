@@ -11,6 +11,19 @@ from barq_support.ingestion.embedding_cache import load_cache, save_embedding, g
 ARTICLES_ENDPOINT = "http://localhost:8000/kb-articles"
 BATCH_SIZE = 50
 
+import json
+from pathlib import Path
+
+ARTICLES_PATH = Path(__file__).resolve().parent / "sample_articles.json"
+
+# this function is kept for reference, but we now fetch articles directly from the Task 1 service instead of a local file
+# def load_articles() -> List[Dict]:
+#     """Loads KB articles from the local corpus file instead of the
+#     live Task 1 service, so ingestion doesn't depend on that service
+#     being up."""
+#     with ARTICLES_PATH.open("r", encoding="utf-8") as f:
+#         data = json.load(f)
+#     return data["articles"]
 
 def load_articles() -> List[Dict]:
     """Fetches KB articles directly from the Task 1 FastAPI service."""
