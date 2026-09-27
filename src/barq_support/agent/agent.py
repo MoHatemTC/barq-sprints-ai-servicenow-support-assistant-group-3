@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langfuse import Langfuse, get_client
 from langfuse.langchain import CallbackHandler
 
@@ -12,16 +12,17 @@ from .middleware import ExecutionGuardMiddleware, S3AgentState
 from .prompts import SYSTEM_PROMPT
 
 
-def build_llm(settings: Settings) -> ChatGoogleGenerativeAI:
-    return ChatGoogleGenerativeAI(
+def build_llm(settings: Settings) -> ChatOpenAI:
+    return ChatOpenAI(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
         model=settings.llm_model,
-        google_api_key=settings.gemini_api_key,
         max_retries=1,
     )
 
 
 def build_agent(
-    llm: ChatGoogleGenerativeAI,
+    llm: ChatOpenAI,
     tools: list,
     max_iterations: int,
 ):
