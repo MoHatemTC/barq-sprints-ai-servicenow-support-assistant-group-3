@@ -34,6 +34,7 @@ def extract_event_id(payload: dict[str, Any]) -> str | None:
         payload.get("event_id")
         or payload.get("incident_sys_id")
         or payload.get("sys_id")
+        or payload.get("article_id")   # KB article webhook events
     )
     if candidate is not None:
         cand_str = str(candidate).strip()

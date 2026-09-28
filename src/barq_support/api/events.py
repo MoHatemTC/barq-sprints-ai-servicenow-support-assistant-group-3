@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from ..dedup import check_and_set_dedup, extract_event_id, get_redis_client
 from ..security import verify_hmac_signature
 from ..settings import get_settings
-from ..tasks import process_servicenow_event
+from ..tasks import process_servicenow_event, sync_kb_article
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +85,16 @@ async def receive_servicenow_webhook(
             "message": "Duplicate event ignored",
         }
 
-    # Step 5: Fast Celery dispatch
-    task = process_servicenow_event.delay(payload)
-    logger.info("Dispatched event %s to Celery task %s", event_id, task.id)
+    # Step 5: Fast Celery dispatch — branch on event type
+    if "article_id" in payload:
+        task = sync_kb_article.delay(payload)
+        logger.info(
+            "Dispatched KB event %s (op=%s) to Celery task %s",
+            event_id, payload.get("operation"), task.id,
+        )
+    else:
+        task = process_servicenow_event.delay(payload)
+        logger.info("Dispatched incident event %s to Celery task %s", event_id, task.id)
 
     return {
         "status": "accepted",

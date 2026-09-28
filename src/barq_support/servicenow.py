@@ -131,3 +131,30 @@ class ServiceNowClient:
                 "x_2215697_ai_ser_0_ai_status": "in_progress",
             },
         )
+
+    def get_kb_article(self, sys_id: str) -> dict[str, Any]:
+        """Fetch a single KB article by sys_id from kb_knowledge table."""
+        return self._request(
+            "GET",
+            f"/api/now/table/kb_knowledge/{sys_id}",
+            params={
+                "sysparm_fields": (
+                    "sys_id,number,short_description,text,category,workflow_state"
+                )
+            },
+        )
+
+    def list_kb_articles(self) -> list[dict[str, Any]]:
+        """Fetch all published KB articles from kb_knowledge table."""
+        resp = self._request(
+            "GET",
+            "/api/now/table/kb_knowledge",
+            params={
+                "sysparm_query": "workflow_state=published",
+                "sysparm_fields": (
+                    "sys_id,number,short_description,text,category"
+                ),
+                "sysparm_limit": "1000",
+            },
+        )
+        return resp.get("result", [])

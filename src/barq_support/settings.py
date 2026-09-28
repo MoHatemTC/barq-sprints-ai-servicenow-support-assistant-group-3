@@ -34,6 +34,10 @@ class Settings(BaseSettings):
 
     # Agent
     agent_max_iterations: int = Field(default=5)
+
+    # KB ingestion
+    chunk_size: int = Field(default=500)
+    chunk_overlap: int = Field(default=50)
     
 
     # Webhook & Dedup

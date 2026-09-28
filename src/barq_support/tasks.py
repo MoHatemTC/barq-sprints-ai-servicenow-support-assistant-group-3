@@ -5,6 +5,7 @@ from .celery_app import celery_app
 from .servicenow import ServiceNowClient
 from .settings import get_settings
 from .worker import process_incident
+from .ingestion.ingest import ingest_article, delete_article
 
 logger = logging.getLogger(__name__)
 
@@ -84,3 +85,33 @@ def process_servicenow_event(self, event_payload: dict[str, Any]) -> dict[str, A
         "claimed": True,
         "agent_result": safe_agent_result,
     }
+
+
+@celery_app.task(name="barq_support.tasks.sync_kb_article", bind=True)
+def sync_kb_article(self, event_payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Celery task for KB article webhook events (created / updated / deleted).
+
+    - created / updated: fetch article from ServiceNow, re-chunk, re-embed, upsert Qdrant.
+    - deleted:           remove all Qdrant vectors for that article.
+    """
+    article_id = event_payload.get("article_id")
+    operation = event_payload.get("operation", "updated")
+
+    if not article_id:
+        err = f"No article_id in KB event payload: {event_payload}"
+        logger.error(err)
+        raise ValueError(err)
+
+    logger.info(
+        "Executing KB sync task: article_id=%s operation=%s", article_id, operation
+    )
+
+    if operation == "deleted":
+        result = delete_article(article_id)
+    else:
+        result = ingest_article(article_id)
+
+    safe_result = _sanitize_for_json(result)
+    logger.info("KB sync finished: %s", safe_result)
+    return {"status": "success", "operation": operation, **safe_result}
