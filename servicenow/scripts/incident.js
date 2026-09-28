@@ -15,11 +15,11 @@
         var aiStatus = '';
 
         try {
-            aiProcessed = current.getValue('ai_processed') == 'true';
+            aiProcessed = (current.getValue('x_2215697_ai_ser_0_ai_processed') == 'true' || current.getValue('x_2215697_ai_ser_0_ai_processed') == '1' || current.getValue('ai_processed') == 'true');
         } catch (e1) { aiProcessed = false; }
 
         try {
-            aiStatus = current.getValue('ai_status') || '';
+            aiStatus = current.getValue('x_2215697_ai_ser_0_ai_status') || current.getValue('ai_status') || '';
         } catch (e2) { aiStatus = ''; }
 
         var category = current.getValue('category') || '';
