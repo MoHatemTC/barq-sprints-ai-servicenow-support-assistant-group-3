@@ -40,4 +40,4 @@ uv run pytest             # offline tests; live-Qdrant tests skip automatically
 | S2.2 | Semantic retrieval + threshold gate | Aliaa |
 | S2.3 | Agent tool schemas (no resolve/close/reassign) | team |
 | S2.4 | Agent reasoning + grounded generation | Dana |
-| S2.5 | Retrieval benchmark & threshold evaluation | Ashraf |
+| S2.5 | Retrieval benchmark & threshold evaluation | Ashar |
