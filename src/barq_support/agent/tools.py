@@ -1,186 +1,194 @@
-"""
-BARQ G3 - Sprint 2 (S2.3) - Agent Tool Definitions
-AI ServiceNow Support Assistant
-
-Defines the four LangChain-compatible tools the agent can invoke. This is
-strictly a definitions task: tool bodies here are mocks/stubs that return
-a dummy string, with no network calls and no dependency on how the caller
-passes incident context.
-
-Deliberately NOT included in this sprint:
-  * Any real ServiceNow API call. Knowledge retrieval in this pipeline is
-    handled by the team's vector store (Qdrant), not ServiceNow keyword
-    search — wiring that up belongs to the sprint where retrieval
-    components merge, not here.
-  * Any ambient state (ContextVar, globals, etc.) for the current
-    incident. Keeping tool bodies pure/self-contained means a teammate
-    can import and call any tool directly with no setup and no
-    credentials, which matters for testing the agent loop in S2.4.
-
-The incident is preloaded into context by the caller, so there is no
-"fetch incident" tool here.
-
-STRUCTURAL GUARANTEE — no resolve / close / reassign:
-Exactly four tools are exported in AGENT_TOOLS. None of the four input
-schemas has a field that could carry a resolve/close/reassign instruction
-(no state, close_code, assignment_group, or assigned_to field exists
-anywhere in this module) — so there is no code path, mocked or real,
-through which such an action could be requested.
-"""
-
-from __future__ import annotations
-
 from typing import List
 
-from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, Field
+
+from ..servicenow import ServiceNowClient
+from ..retrieval.retriever import search_kb
 
 
-# ---------------------------------------------------------------------------
-# 1. Knowledge Base Search Tool  — REPEATABLE
-# ---------------------------------------------------------------------------
-
-class KnowledgeBaseSearchInput(BaseModel):
+class SearchKBInput(BaseModel):
     query: str = Field(
         ...,
-        description="The search query used to look up relevant knowledge base articles.",
+        description="Natural-language query used to search the knowledge base.",
     )
 
 
-def _knowledge_base_search(query: str) -> str:
-    """Stub. Real retrieval is handled by the Qdrant vector store in a
-    later sprint; this returns a placeholder so the tool contract can be
-    exercised end-to-end without that dependency."""
-    return f"[STUB] knowledge_base_search called with query='{query}'. No retrieval backend wired yet."
-
-
-knowledge_base_search_tool = StructuredTool.from_function(
-    func=_knowledge_base_search,
-    name="knowledge_base_search",
-    description=(
-        "Searches the support knowledge base for articles relevant to the "
-        "incident currently loaded in context. Use it to gather candidate "
-        "solutions, troubleshooting steps, or reference material before "
-        "forming an answer. This tool can be called repeatedly without "
-        "ending the run — invoke it as many times as needed to refine a "
-        "query or explore different angles before you commit to a final "
-        "action."
-    ),
-    args_schema=KnowledgeBaseSearchInput,
-)
-
-
-# ---------------------------------------------------------------------------
-# 2. Internal Work Note Tool  — REPEATABLE
-# ---------------------------------------------------------------------------
-
-class InternalWorkNoteInput(BaseModel):
-    note_text: str = Field(
-        ...,
-        description="Free-text note to log internally against the incident. Not visible to the end user.",
-    )
-
-
-def _internal_work_note(note_text: str) -> str:
-    """Stub. Real persistence (ServiceNow work_notes write) is deferred
-    to the sprint where components merge."""
-    return f"[STUB] internal_work_note called with note_text='{note_text}'. Not persisted."
-
-
-internal_work_note_tool = StructuredTool.from_function(
-    func=_internal_work_note,
-    name="internal_work_note",
-    description=(
-        "Records an internal, agent-only note against the incident — for "
-        "example a reasoning checkpoint, an interim finding, or context "
-        "meant for a future human reviewer. Notes are internal-only and are "
-        "never shown to the requester. This tool can be called repeatedly "
-        "without ending the run — use it as often as you like to keep a "
-        "trail of your reasoning while you work through the incident."
-    ),
-    args_schema=InternalWorkNoteInput,
-)
-
-
-# ---------------------------------------------------------------------------
-# 3. Final Grounded Answer Tool  — TERMINAL
-# ---------------------------------------------------------------------------
-
-class FinalGroundedAnswerInput(BaseModel):
-    resolution_procedure: str = Field(
-        ...,
-        description="The step-by-step resolution procedure to present to the user, grounded in retrieved knowledge.",
-    )
-    knowledge_article_references: List[str] = Field(
+class AddWorkNoteInput(BaseModel):
+    note: str = Field(
         ...,
         min_length=1,
-        description="One or more knowledge article identifiers or titles that support this answer.",
+        description="Internal processing note to add to the incident.",
     )
 
 
-def _final_grounded_answer(
-    resolution_procedure: str, knowledge_article_references: List[str]
-) -> str:
-    """Stub. No network I/O — just formats and returns the terminal payload."""
-    refs = ", ".join(knowledge_article_references)
-    return f"[STUB] FINAL ANSWER — Procedure: {resolution_procedure} | Sources: {refs}"
-
-
-final_grounded_answer_tool = StructuredTool.from_function(
-    func=_final_grounded_answer,
-    name="final_grounded_answer",
-    description=(
-        "Delivers the agent's final, knowledge-grounded resolution "
-        "procedure to the user, together with the specific knowledge "
-        "article(s) it is based on. This tool ends the run — it is the "
-        "agent's terminal action when it has a complete, sourced answer. "
-        "Only call it once the procedure is backed by at least one "
-        "concrete knowledge article reference; never call it speculatively "
-        "or without a citation."
-    ),
-    args_schema=FinalGroundedAnswerInput,
-)
-
-
-# ---------------------------------------------------------------------------
-# 4. Human Review Hand-off Tool  — TERMINAL
-# ---------------------------------------------------------------------------
-
-class HumanReviewHandoffInput(BaseModel):
-    handoff_reason: str = Field(
+class SuggestAnswerInput(BaseModel):
+    procedure: str = Field(
         ...,
-        description="Explanation of why this incident needs to be handed off to a human reviewer instead of being answered by the agent.",
+        min_length=1,
+        description="Grounded resolution procedure to suggest.",
+    )
+    sources: List[str] = Field(
+        ...,
+        min_length=1,
+        description="Knowledge-base sources supporting the procedure.",
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence score derived via LLM self-assessment based on "
+            "grounded KB evidence, constrained to [0.0, 1.0]."
+        ),
     )
 
 
-def _human_review_handoff(handoff_reason: str) -> str:
-    """Stub. No network I/O — just formats and returns the terminal payload."""
-    return f"[STUB] HAND-OFF TO HUMAN REVIEW — Reason: {handoff_reason}"
+class RequestHRInput(BaseModel):
+    reason: str = Field(
+        ...,
+        min_length=1,
+        description="Reason for escalation to human/HR review.",
+    )
 
 
-human_review_handoff_tool = StructuredTool.from_function(
-    func=_human_review_handoff,
-    name="human_review_handoff",
-    description=(
-        "Hands the incident off to a human reviewer when the agent cannot "
-        "safely or confidently resolve it — for example insufficient "
-        "knowledge base coverage, ambiguous requester intent, or a request "
-        "outside the agent's authority. This tool ends the run — it is the "
-        "agent's terminal action when a human needs to take over. Note: "
-        "this tool only flags the incident for a human; it does not "
-        "resolve, close, or reassign the incident itself."
-    ),
-    args_schema=HumanReviewHandoffInput,
-)
+def build_tools(
+    servicenow: ServiceNowClient,
+    incident_sys_id: str,
+    qdrant_client,
+) -> tuple[list[StructuredTool], list[StructuredTool]]:
 
+    retrieved_sources: set[str] = set()
+    retrieved_article_ids: set[str] = set()
 
-# ---------------------------------------------------------------------------
-# Exported tool list — exactly four tools, no more, no less.
-# ---------------------------------------------------------------------------
+    def search_kb_tool(query: str) -> list[dict]:
+        results = search_kb(
+            query=query,
+            client=qdrant_client,
+        )
 
-REPEATABLE_TOOLS = [knowledge_base_search_tool, internal_work_note_tool]
-TERMINAL_TOOLS = [final_grounded_answer_tool, human_review_handoff_tool]
+        # Demo evidence: show the actual chunks returned by Qdrant.
+        print("\n" + "=" * 70)
+        print("SEARCHKB RETURNED CHUNKS")
+        print("=" * 70)
 
-AGENT_TOOLS = REPEATABLE_TOOLS + TERMINAL_TOOLS
+        for index, result in enumerate(results, start=1):
+            print(f"\nChunk {index}")
+            print(f"Score:       {result.get('score')}")
+            print(f"Article ID:  {result.get('article_id')}")
+            print(f"Section:     {result.get('section')}")
+            print(f"Chunk Index: {result.get('chunk_index')}")
+            print(f"Category:    {result.get('category')}")
+            print(f"Text:        {result.get('text', '')}")
 
-assert len(AGENT_TOOLS) == 4, "Exactly four tools must be defined for S2.3."
+        # Track sources returned during this execution.
+        for result in results:
+            article_id = result.get("article_id")
+            chunk_index = result.get("chunk_index")
+
+            if article_id is not None:
+                source_id = (
+                    f"{article_id}#chunk-{chunk_index}"
+                    if chunk_index is not None
+                    else str(article_id)
+                )
+
+                retrieved_sources.add(source_id)
+                retrieved_article_ids.add(str(article_id))
+
+        return results
+
+    def add_work_note_tool(note: str) -> dict:
+        return servicenow.add_work_note(
+            sys_id=incident_sys_id,
+            note=note,
+        )
+
+    def suggest_answer_tool(
+        procedure: str,
+        sources: List[str],
+        confidence: float,
+    ) -> dict:
+        """Submit a grounded answer suggestion for human review.
+
+        Confidence is derived via LLM self-assessment based on grounded KB
+        evidence, constrained to [0.0, 1.0].
+        """
+
+        normalized_sources = {
+            source.strip()
+            for source in sources
+        }
+
+        if not all(
+            source in retrieved_sources
+            or source in retrieved_article_ids
+            for source in normalized_sources
+        ):
+            raise ValueError(
+                "suggestAnswer sources must come from "
+                "searchKB results retrieved during this execution."
+            )
+
+        response = (
+            f"{procedure}\n\nSources:\n"
+            + "\n".join(f"- {source}" for source in sources)
+        )
+
+        return servicenow.suggest_answer(
+            sys_id=incident_sys_id,
+            response=response,
+            confidence=confidence,
+        )
+
+    def request_hr_tool(reason: str) -> dict:
+        return servicenow.request_hr(
+            sys_id=incident_sys_id,
+            reason=reason,
+        )
+
+    search_tool = StructuredTool.from_function(
+        func=search_kb_tool,
+        name="searchKB",
+        description=(
+            "Search the ServiceNow knowledge base using dense vector retrieval. "
+            "This tool is repeatable and non-terminal."
+        ),
+        args_schema=SearchKBInput,
+    )
+
+    work_note_tool = StructuredTool.from_function(
+        func=add_work_note_tool,
+        name="addWorkNote",
+        description=(
+            "Add an internal processing work note to the current incident. "
+            "This tool is repeatable and non-terminal."
+        ),
+        args_schema=AddWorkNoteInput,
+    )
+
+    suggest_tool = StructuredTool.from_function(
+        func=suggest_answer_tool,
+        name="suggestAnswer",
+        description=(
+            "Submit a grounded answer suggestion for human review. "
+            "This is a terminal tool. Use only when sufficient evidence "
+            "has been gathered. Confidence is derived via LLM self-assessment "
+            "based on grounded KB evidence, constrained to [0.0, 1.0]."
+        ),
+        args_schema=SuggestAnswerInput,
+        return_direct=True,
+    )
+
+    hr_tool = StructuredTool.from_function(
+        func=request_hr_tool,
+        name="requestHR",
+        description=(
+            "Escalate the incident for human/HR review. "
+            "This is a terminal tool."
+        ),
+        args_schema=RequestHRInput,
+        return_direct=True,
+    )
+
+    return [search_tool, work_note_tool], [suggest_tool, hr_tool]
