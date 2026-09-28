@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from ..dedup import check_and_set_dedup, extract_event_id, get_redis_client
 from ..security import verify_hmac_signature
+from ..servicenow import ServiceNowClient
 from ..settings import get_settings
 from ..tasks import process_servicenow_event, sync_kb_article
 
@@ -93,6 +94,26 @@ async def receive_servicenow_webhook(
             event_id, payload.get("operation"), task.id,
         )
     else:
+        # Step 5a: Claim incident in ServiceNow (ai_status=in_progress) at queue time
+        incident_sys_id = (
+            payload.get("sys_id")
+            or payload.get("incident_sys_id")
+            or event_id
+        )
+        try:
+            sn_client = ServiceNowClient(settings)
+            sn_client.claim_incident(incident_sys_id)
+            logger.info(
+                "Claimed incident %s in ServiceNow (ai_status=in_progress) at queue time",
+                incident_sys_id,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to claim incident %s at queue time (%s). Proceeding with Celery dispatch.",
+                incident_sys_id,
+                exc,
+            )
+
         task = process_servicenow_event.delay(payload)
         logger.info("Dispatched incident event %s to Celery task %s", event_id, task.id)
 

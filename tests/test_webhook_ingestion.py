@@ -97,13 +97,16 @@ def test_dedup_gate_atomic_setnx():
 # 3. Endpoint Integration Tests (POST /api/v1/events/servicenow)
 # ==============================================================================
 
+@patch("barq_support.api.events.ServiceNowClient")
 @patch("barq_support.api.events.process_servicenow_event.delay")
 @patch("barq_support.api.events.check_and_set_dedup")
-def test_endpoint_valid_signed_request(mock_dedup, mock_delay, client, secret):
+def test_endpoint_valid_signed_request(mock_dedup, mock_delay, mock_sn_cls, client, secret):
     mock_dedup.return_value = True
     mock_task = MagicMock()
     mock_task.id = "celery-task-uuid-1234"
     mock_delay.return_value = mock_task
+    mock_sn = MagicMock()
+    mock_sn_cls.return_value = mock_sn
 
     payload = {
         "incident_sys_id": "47138238a9fe1981016e3762d1fd26d4",
@@ -125,7 +128,69 @@ def test_endpoint_valid_signed_request(mock_dedup, mock_delay, client, secret):
     assert data["event_id"] == "47138238a9fe1981016e3762d1fd26d4"
     assert data["task_id"] == "celery-task-uuid-1234"
     assert data["deduplicated"] is False
+    mock_sn.claim_incident.assert_called_once_with("47138238a9fe1981016e3762d1fd26d4")
     mock_delay.assert_called_once_with(payload)
+
+
+@patch("barq_support.api.events.ServiceNowClient")
+@patch("barq_support.api.events.process_servicenow_event.delay")
+@patch("barq_support.api.events.check_and_set_dedup")
+def test_endpoint_claims_incident_before_queueing_celery_task(mock_dedup, mock_delay, mock_sn_cls, client, secret):
+    mock_dedup.return_value = True
+    call_order = []
+    mock_sn = MagicMock()
+    mock_sn.claim_incident.side_effect = lambda sys_id: call_order.append("claim")
+    mock_sn_cls.return_value = mock_sn
+    mock_delay.side_effect = lambda p: (
+        call_order.append("enqueue"),
+        MagicMock(id="celery-task-seq-1"),
+    )[1]
+
+    payload = {
+        "incident_sys_id": "sys_ordering_check",
+        "number": "INC0009999",
+    }
+    raw_bytes = json.dumps(payload).encode("utf-8")
+    sig = compute_hmac_signature(raw_bytes, secret)
+
+    response = client.post(
+        "/api/v1/events/servicenow",
+        content=raw_bytes,
+        headers={"Content-Type": "application/json", "X-Signature": sig},
+    )
+
+    assert response.status_code == 202
+    assert call_order == ["claim", "enqueue"]
+    mock_sn.claim_incident.assert_called_once_with("sys_ordering_check")
+
+
+@patch("barq_support.api.events.ServiceNowClient")
+@patch("barq_support.api.events.sync_kb_article.delay")
+@patch("barq_support.api.events.check_and_set_dedup")
+def test_endpoint_kb_article_event_does_not_claim_incident(mock_dedup, mock_kb_delay, mock_sn_cls, client, secret):
+    mock_dedup.return_value = True
+    mock_kb_task = MagicMock()
+    mock_kb_task.id = "kb-task-123"
+    mock_kb_delay.return_value = mock_kb_task
+    mock_sn = MagicMock()
+    mock_sn_cls.return_value = mock_sn
+
+    payload = {
+        "article_id": "kb_sys_123",
+        "operation": "updated",
+    }
+    raw_bytes = json.dumps(payload).encode("utf-8")
+    sig = compute_hmac_signature(raw_bytes, secret)
+
+    response = client.post(
+        "/api/v1/events/servicenow",
+        content=raw_bytes,
+        headers={"Content-Type": "application/json", "X-Signature": sig},
+    )
+
+    assert response.status_code == 202
+    mock_kb_delay.assert_called_once_with(payload)
+    mock_sn.claim_incident.assert_not_called()
 
 
 @patch("barq_support.api.events.process_servicenow_event.delay")
