@@ -157,7 +157,7 @@ Before calling suggestAnswer, verify:
 3. Every proposed step is explicitly supported by the retrieved content.
 4. No important part of the reported problem remains unsupported.
 
-If any of these conditions is not satisfied, call requestHR.python check_retrieval.py
+If any of these conditions is not satisfied, call requestHR.
 
 The procedure must contain only steps supported by the retrieved KB content.
 
