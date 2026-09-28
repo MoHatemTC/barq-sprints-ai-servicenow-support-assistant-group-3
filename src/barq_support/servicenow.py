@@ -129,6 +129,5 @@ class ServiceNowClient:
             f"/api/now/table/incident/{sys_id}",
             json={
                 "x_2215697_ai_ser_0_ai_status": "in_progress",
-                "x_2215697_s3_web_0_ai_status": "in_progress",
             },
-        )
+        )
