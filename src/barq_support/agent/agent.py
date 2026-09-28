@@ -116,7 +116,7 @@ def generate_recommendation(
         llm = build_llm(settings)
     max_iterations = settings.agent_max_iterations if settings else DEFAULT_MAX_ITERATIONS
 
-    from .tools import build_tools  # lazy: needs langchain_core
+    from .scoped_tools import build_tools  # lazy: needs langchain_core
 
     tools = build_tools(chunks)
     executor = build_agent_executor(llm, tools, max_iterations)
