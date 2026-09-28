@@ -45,7 +45,9 @@ _patch_kombu_for_redis3()
 settings = get_settings()
 
 broker_url = settings.celery_broker_url or settings.redis_url
-result_backend = settings.celery_result_backend or settings.redis_url
+# We fire-and-forget: results are written to ServiceNow, not stored in Redis.
+# Disabling the result backend avoids a HELLO handshake incompatible with Redis 3.x.
+result_backend = settings.celery_result_backend or None
 
 celery_app = Celery(
     "barq_support",
@@ -62,6 +64,7 @@ celery_app.conf.update(
     enable_utc=True,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
+    task_ignore_result=True,
     broker_transport_options={
         "visibility_timeout": 3600,
     },
