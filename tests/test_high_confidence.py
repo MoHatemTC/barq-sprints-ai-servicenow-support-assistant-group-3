@@ -6,7 +6,11 @@ from barq_support.agent.agent import run_agent
 class FakeSettings:
     agent_max_iterations = 5
     llm_model = "fake"
-    gemini_api_key = "fake"
+    llm_api_key = "fake"
+    llm_base_url = "http://localhost:0/v1"
+    langfuse_public_key = "fake"
+    langfuse_secret_key = "fake"
+    langfuse_host = "http://localhost:0"
 
 
 class FakeServiceNow:
@@ -87,7 +91,7 @@ def fake_build_agent(llm, tools, max_iterations):
 
     class FakeAgent:
 
-        def invoke(self, input_data):
+        def invoke(self, input_data, **kwargs):
             print("AGENT STARTED")
 
             search_tool = next(

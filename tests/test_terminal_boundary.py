@@ -22,6 +22,12 @@ class FakeTool:
 
 class FakeSettings:
     agent_max_iterations = 2
+    llm_model = "fake"
+    llm_api_key = "fake"
+    llm_base_url = "http://localhost:0/v1"
+    langfuse_public_key = "fake"
+    langfuse_secret_key = "fake"
+    langfuse_host = "http://localhost:0"
 
 
 fake_hr_tool = FakeTool()
@@ -39,7 +45,7 @@ def fake_build_llm(settings):
 
 def fake_build_agent(llm, tools, max_iterations):
     class FakeAgent:
-        def invoke(self, input_data):
+        def invoke(self, input_data, **kwargs):
             print("FAKE AGENT FINISHED WITHOUT TERMINAL DECISION")
             return {
                 "s3_budget_exhausted": True,

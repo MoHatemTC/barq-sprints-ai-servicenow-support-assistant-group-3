@@ -26,23 +26,33 @@ tool = StructuredTool.from_function(
     description="Search the knowledge base for relevant procedures.",
 )
 
-settings = get_settings()
+def _run_live_smoke():
+    """Manual live smoke test: hits the real configured LLM endpoint.
 
-agent = build_agent(
-    build_llm(settings),
-    [tool],
-    3,
-)
+    Not collected as an automated test -- requires real LLM_* credentials.
+    Run directly: `uv run python tests/test_agent_runtime.py`.
+    """
+    settings = get_settings()
 
-result = agent.invoke(
-    {
-        "messages": [
-            {
-                "role": "user",
-                "content": "Search the KB for a procedure to resolve this test incident.",
-            }
-        ]
-    }
-)
+    agent = build_agent(
+        build_llm(settings),
+        [tool],
+        3,
+    )
 
-print(result)
+    result = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Search the KB for a procedure to resolve this test incident.",
+                }
+            ]
+        }
+    )
+
+    print(result)
+
+
+if __name__ == "__main__":
+    _run_live_smoke()
