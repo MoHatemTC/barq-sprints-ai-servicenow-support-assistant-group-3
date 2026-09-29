@@ -1,38 +1,58 @@
 [project]
 name = "barq-sprints-ai-servicenow-support-assistant-group-3"
 version = "0.1.0"
-description = "Add your description here"
+description = "BARQ G3 - AI ServiceNow Support Assistant"
+readme = "README.md"
 authors = [
     { name = "Malak Rabie", email = "158449620+malakmrabie@users.noreply.github.com" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
-    "langchain>=0.3.0",
-    "langchain-core>=0.3.0",
-    "langchain-openai>=0.3.0",
-    "pydantic>=2.0",
-    "beautifulsoup4>=4.15.0",
-    "google-genai>=2.24.0",
+    "celery>=5.4.0",
+    "fastapi>=0.115.0",
+    "google-genai>=2.25.0",
     "httpx>=0.28.1",
-    "pydantic-settings>=2.15.0",
-    "python-dotenv>=1.2.3",
+    "langchain>=1.4.2",
+    "langchain-core>=1.6.4",
+    "langchain-google-genai>=4.4.0",
+    "langchain-openai>=1.6.5",
+    "langfuse>=4.15.6",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "python-dotenv>=1.0.0",
     "qdrant-client>=1.19.1",
     "sentence-transformers>=6.0.1",
+    "langchain-classic>=1.0.8",
+    "langchain-community>=0.4.2",
+    "unstructured[pdf]>=0.27.8",
+    "pytesseract>=0.3.13",
+    "pdf2image>=1.17.0",
+    "langchain-qdrant>=1.1.0",
+    "pymupdf>=1.28.2",
+    "pdfplumber>=0.11.10",
+    "pillow>=12.3.0",
+    "arabic-reshaper>=3.0.1",
+    "python-bidi>=0.6.11",
+    "openai>=3.16.2",
+    "tenacity>=9.1.4",
+    "redis>=5.2.0",
+    "uvicorn[standard]>=0.34.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
 ]
 
 [build-system]
-requires = ["uv_build>=0.12.12,<0.13.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.uv.build-backend]
-module-name = "barq_support"
-module-root = "src"
+[tool.hatch.build.targets.wheel]
+packages = ["src/barq_support"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-]

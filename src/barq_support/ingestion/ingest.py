@@ -1,168 +1,154 @@
-import httpx
-from typing import List, Dict
+"""
+ingestion/ingest.py
+Batch and incremental KB article ingestion pipeline.
+
+Batch (run as script):
+    uv run python -m barq_support.ingestion.ingest
+    -> Fetches all published KB articles from ServiceNow and upserts into Qdrant.
+
+Incremental (called by Celery sync_kb_article task):
+    ingest_article(sys_id)  - upsert one article (created / updated)
+    delete_article(sys_id)  - remove all vectors for one article (deleted / unpublished)
+"""
+
+import logging
+from typing import Any
 
 from barq_support.ingestion.chunker import chunk_article
-from barq_support.ingestion.embedder import embed_texts, EMBEDDING_BATCH_SIZE
-from barq_support.ingestion.qdrant_store import get_client, ensure_collection, upsert_chunks
-from barq_support.config import settings
 from barq_support.ingestion.embedding_cache import load_cache, save_embedding, get_embedding
+from barq_support.ingestion.qdrant_store import (
+    get_client,
+    ensure_collection,
+    upsert_chunks,
+    delete_article_chunks,
+)
+from barq_support.retrieval.embedder import embed_texts, EMBEDDING_BATCH_SIZE
+from barq_support.servicenow import ServiceNowClient
+from barq_support.settings import get_settings
 
+logger = logging.getLogger(__name__)
 
-ARTICLES_ENDPOINT = "http://localhost:8000/kb-articles"
 BATCH_SIZE = 50
 
 
-def load_articles() -> List[Dict]:
-    """Fetches KB articles directly from the Task 1 FastAPI service."""
-    response = httpx.get(ARTICLES_ENDPOINT, timeout=30)
-    response.raise_for_status()
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
-    data = response.json()
-
-    return data["articles"]
+def _sn_client() -> ServiceNowClient:
+    return ServiceNowClient(get_settings())
 
 
-
-FIELDS_USED_SEPARATELY = {"number", "text"}
-
-def build_all_chunks(articles: List[Dict]) -> List[Dict]:
-    all_chunks: List[Dict] = []
-
-    for article in articles:
-        article_id = article["number"]
-        text = article.get("text", "")
-
-        metadata = {
-            k: v for k, v in article.items()
-            if k not in FIELDS_USED_SEPARATELY
-        }
-
-        chunks = chunk_article(
-            article_id, text, metadata=metadata,
-            chunk_size=settings.chunk_size,
-            overlap=settings.chunk_overlap,
-        )
-        all_chunks.extend(chunks)
-
-    return all_chunks
-
-
-def generate_embeddings(chunks: List[Dict]) -> List[List[float]]:
-    """
-    Generates embeddings while reusing previously cached embeddings.
-
-    If the process stops because of quota/rate limits, already completed
-    embeddings remain saved and will be skipped on the next run.
-    """
-
-    cache = load_cache()
-
-    vectors: List[List[float] | None] = [None] * len(chunks)
-
-    pending_chunks: List[tuple[int, Dict]] = []
-
-    for index, chunk in enumerate(chunks):
-        cached_vector = get_embedding(cache, chunk)
-
-        if cached_vector is not None:
-            vectors[index] = cached_vector
-        else:
-            pending_chunks.append((index, chunk))
-
-    cached_count = len(chunks) - len(pending_chunks)
-
-    print(
-        f"Embedding cache: {cached_count} cached, "
-        f"{len(pending_chunks)} remaining."
+def _article_to_chunks(article: dict[str, Any]) -> list[dict[str, Any]]:
+    settings = get_settings()
+    article_id = article.get("sys_id") or article.get("number", "unknown")
+    text = article.get("text", "")
+    metadata = {k: v for k, v in article.items() if k not in {"sys_id", "text"}}
+    return chunk_article(
+        article_id,
+        text,
+        metadata=metadata,
+        chunk_size=settings.chunk_size,
+        overlap=settings.chunk_overlap,
     )
 
-    total_batches = (
-        len(pending_chunks) + EMBEDDING_BATCH_SIZE - 1
-    ) // EMBEDDING_BATCH_SIZE
 
-    for i in range(0, len(pending_chunks), EMBEDDING_BATCH_SIZE):
-        batch = pending_chunks[i:i + EMBEDDING_BATCH_SIZE]
+def _embed_with_cache(chunks: list[dict[str, Any]]) -> list[list[float]]:
+    cache = load_cache()
+    vectors: list[list[float] | None] = [None] * len(chunks)
+    pending: list[tuple[int, dict]] = []
 
-        batch_number = (i // EMBEDDING_BATCH_SIZE) + 1
+    for i, chunk in enumerate(chunks):
+        cached = get_embedding(cache, chunk)
+        if cached is not None:
+            vectors[i] = cached
+        else:
+            pending.append((i, chunk))
 
-        print(
-            f"Embedding batch {batch_number}/{total_batches} "
-            f"({len(batch)} chunks) ..."
-        )
+    logger.info(
+        "Embedding cache: %d cached, %d pending.",
+        len(chunks) - len(pending),
+        len(pending),
+    )
 
+    for b in range(0, len(pending), EMBEDDING_BATCH_SIZE):
+        batch = pending[b : b + EMBEDDING_BATCH_SIZE]
         texts = [chunk["text"] for _, chunk in batch]
-
         batch_vectors = embed_texts(texts)
-
-        if len(batch_vectors) != len(batch):
-            raise RuntimeError(
-                f"Expected {len(batch)} embeddings, "
-                f"but received {len(batch_vectors)}."
-            )
-
-        for (index, chunk), vector in zip(batch, batch_vectors):
-            vectors[index] = vector
+        for (i, chunk), vector in zip(batch, batch_vectors):
+            vectors[i] = vector
             save_embedding(cache, chunk, vector)
 
-        print(
-            f"Saved batch {batch_number} to embedding cache."
-        )
-
-    if any(vector is None for vector in vectors):
-        raise RuntimeError(
-            "Some embeddings are missing. "
-            "The ingestion cannot continue."
-        )
-
-    return [vector for vector in vectors if vector is not None]
+    return [v for v in vectors if v is not None]  # type: ignore[misc]
 
 
+# ---------------------------------------------------------------------------
+# Public API (used by Celery task + batch __main__)
+# ---------------------------------------------------------------------------
 
-def main():
-    print(f"Fetching articles from {ARTICLES_ENDPOINT} ...")
+def ingest_article(sys_id: str) -> dict[str, Any]:
+    """Fetch one KB article from ServiceNow and upsert its chunks into Qdrant."""
+    resp = _sn_client().get_kb_article(sys_id)
+    article: dict[str, Any] = resp.get("result", {})
+    if not article:
+        raise ValueError(f"KB article {sys_id!r} not found in ServiceNow")
 
-    articles = load_articles()
+    article["sys_id"] = sys_id  # ensure key is present for chunker
+    chunks = _article_to_chunks(article)
 
-    print(f"Loaded {len(articles)} articles.")
+    if not chunks:
+        logger.warning("KB article %s produced zero chunks — skipping.", sys_id)
+        return {"sys_id": sys_id, "chunks": 0, "status": "no_content"}
 
-    print(
-        f"Chunking articles "
-        f"(chunk_size={settings.chunk_size}, "
-        f"overlap={settings.chunk_overlap}) ..."
-    )
+    vectors = _embed_with_cache(chunks)
+    qdrant = get_client()
+    ensure_collection(qdrant)
+    upsert_chunks(qdrant, chunks, vectors)
 
-    chunks = build_all_chunks(articles)
+    logger.info("Upserted %d chunks for KB article %s.", len(chunks), sys_id)
+    return {"sys_id": sys_id, "chunks": len(chunks), "status": "upserted"}
 
-    print(f"Produced {len(chunks)} chunks.")
 
-    print("Generating embeddings ...")
+def delete_article(sys_id: str) -> dict[str, Any]:
+    """Remove all Qdrant vectors for an article (deleted or unpublished in ServiceNow)."""
+    qdrant = get_client()
+    delete_article_chunks(qdrant, sys_id)
+    logger.info("Deleted Qdrant vectors for KB article %s.", sys_id)
+    return {"sys_id": sys_id, "status": "deleted"}
 
-    vectors = generate_embeddings(chunks)
 
-    print("Connecting to Qdrant and ensuring collection exists ...")
+def load_all_articles() -> list[dict[str, Any]]:
+    """Fetch every published KB article from ServiceNow (batch ingest helper)."""
+    return _sn_client().list_kb_articles()
 
-    client = get_client()
 
-    ensure_collection(client)
+# ---------------------------------------------------------------------------
+# Batch ingest entry-point
+# ---------------------------------------------------------------------------
 
-    print(
-        f"Upserting {len(chunks)} points "
-        f"in batches of {BATCH_SIZE} ..."
-    )
+def main() -> None:
+    import sys
 
-    upsert_chunks(
-        client,
-        chunks,
-        vectors,
-        batch_size=BATCH_SIZE,
-    )
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    logger.info("Fetching published KB articles from ServiceNow ...")
 
-    info = client.get_collection("kb_articles")
+    articles = load_all_articles()
+    logger.info("Loaded %d articles.", len(articles))
 
-    print(
-        f"Done. Collection now has "
-        f"{info.points_count} points."
-    )
+    all_chunks: list[dict[str, Any]] = []
+    for article in articles:
+        article.setdefault("sys_id", article.get("number", "unknown"))
+        all_chunks.extend(_article_to_chunks(article))
+
+    logger.info("Produced %d chunks.", len(all_chunks))
+    vectors = _embed_with_cache(all_chunks)
+
+    qdrant = get_client()
+    ensure_collection(qdrant)
+    upsert_chunks(qdrant, all_chunks, vectors, batch_size=BATCH_SIZE)
+
+    info = qdrant.get_collection(get_settings().qdrant_collection)
+    logger.info("Done. Collection now has %s points.", info.points_count)
 
 
 if __name__ == "__main__":

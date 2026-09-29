@@ -3,102 +3,101 @@ import uuid
 from typing import List, Dict
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FilterSelector, FieldCondition, MatchValue
 
-from barq_support.config import settings
-from barq_support.ingestion.embedder import EMBEDDING_DIMENSION
- 
-COLLECTION_NAME = "kb_articles" 
-VECTOR_SIZE = EMBEDDING_DIMENSION # 3072 for Gemini Embedding 2 
-def get_client() -> QdrantClient: 
-    """Creates a Qdrant client connected to the cloud cluster from .env.""" 
-    return QdrantClient( 
-             url=settings.qdrant_url, 
-             api_key=settings.qdrant_api_key,
-             timeout=120,) 
-    
-def ensure_collection( 
-    client: QdrantClient, 
-    vector_size: int = VECTOR_SIZE, 
-    ) -> None: 
-    """Creates the collection if it doesn't already exist.""" 
-    
-    existing = [c.name for c in client.get_collections().collections] 
-    if COLLECTION_NAME in existing: 
-        return 
-    client.create_collection( 
-        collection_name=COLLECTION_NAME, 
+from barq_support.settings import get_settings
+from barq_support.retrieval.embedder import EMBEDDING_DIMENSION
+
+VECTOR_SIZE = EMBEDDING_DIMENSION  # 3072 for Gemini Embedding 2
+
+
+def _collection_name() -> str:
+    return get_settings().qdrant_collection
+
+
+def get_client() -> QdrantClient:
+    settings = get_settings()
+    return QdrantClient(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
+        timeout=120,
+    )
+
+
+def ensure_collection(
+    client: QdrantClient,
+    vector_size: int = VECTOR_SIZE,
+) -> None:
+    name = _collection_name()
+    existing = [c.name for c in client.get_collections().collections]
+    if name in existing:
+        return
+    client.create_collection(
+        collection_name=name,
         vectors_config=VectorParams(
-            size=vector_size, 
-            distance=Distance.COSINE, 
-            ), 
-        ) 
-    
+            size=vector_size,
+            distance=Distance.COSINE,
+        ),
+    )
+
+
 def generate_point_id(
     article_id: str,
     section: str,
     chunk_index: int,
     chunk_text: str,
 ) -> str:
-    """
-    Deterministic ID from source (article_id + section + chunk_index)
-    AND the chunk's own text. Same chunk on re-run -> same ID (overwrite,
-    no duplicate). Different chunk text at the same index (e.g. after
-    changing chunk_size/overlap) -> a different ID, so old points don't
-    get silently overwritten by unrelated content.
-    """
     raw_key = f"{article_id}::{section}::{chunk_index}::{chunk_text}"
     digest = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, digest)) 
-    
-def build_point( 
-  chunk: Dict, 
-  vector: List[float], 
-  ) -> PointStruct: 
-    """Builds a single Qdrant point from a chunk and its embedding vector."""
-    
-    point_id = generate_point_id( 
-      chunk["article_id"],
-      chunk["section"], 
-      chunk["chunk_index"], 
-      chunk["text"],
-    ) 
-    
-    payload = { 
-      "text": chunk["text"], 
-      "article_id": chunk["article_id"], 
-      "section": chunk["section"], 
-      "chunk_index": chunk["chunk_index"], 
-      **chunk.get("metadata", {}), 
-    } 
-    
-    return PointStruct( 
-     id=point_id, 
-     vector=vector,
-     payload=payload, 
-    ) 
-    
-def upsert_chunks( 
-    client: QdrantClient, 
-    chunks: List[Dict], 
-    vectors: List[List[float]], 
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, digest))
+
+
+def build_point(chunk: Dict, vector: List[float]) -> PointStruct:
+    point_id = generate_point_id(
+        chunk["article_id"],
+        chunk["section"],
+        chunk["chunk_index"],
+        chunk["text"],
+    )
+    payload = {
+        "text": chunk["text"],
+        "article_id": chunk["article_id"],
+        "section": chunk["section"],
+        "chunk_index": chunk["chunk_index"],
+        **chunk.get("metadata", {}),
+    }
+    return PointStruct(id=point_id, vector=vector, payload=payload)
+
+
+def upsert_chunks(
+    client: QdrantClient,
+    chunks: List[Dict],
+    vectors: List[List[float]],
     batch_size: int = 100,
-) -> None: 
-    """ Upserts chunks with their pre-computed vectors into Qdrant in batches. 
-    Since point IDs are deterministic, re-running ingestion over the same 
-    chunks overwrites the existing points instead of creating duplicates. 
-    """ 
-    
-    points = [ 
-      build_point(chunk, vector) 
-      for chunk, vector in zip(chunks, vectors)
-    ] 
-    
-    for i in range(0, len(points), batch_size): 
-        batch = points[i:i + batch_size] 
-        
-        client.upsert( 
-          collection_name=COLLECTION_NAME, 
-          points=batch, 
-        ) 
-        
+) -> None:
+    name = _collection_name()
+    points = [build_point(c, v) for c, v in zip(chunks, vectors)]
+    for i in range(0, len(points), batch_size):
+        client.upsert(collection_name=name, points=points[i : i + batch_size])
+
+
+def delete_article_chunks(client: QdrantClient, article_id: str) -> int:
+    """Delete all Qdrant vectors whose payload article_id matches.
+    Returns the number of points deleted (approximate — Qdrant reports
+    operation info, not exact count, so we return 0 on delete-by-filter).
+    """
+    name = _collection_name()
+    client.delete(
+        collection_name=name,
+        points_selector=FilterSelector(
+            filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="article_id",
+                        match=MatchValue(value=article_id),
+                    )
+                ]
+            )
+        ),
+    )
+    return 0  # Qdrant delete-by-filter does not return exact count
