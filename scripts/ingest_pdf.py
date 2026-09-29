@@ -3,7 +3,7 @@
 scripts/ingest_pdf.py
 
 CLI contract (S3.5):
-    uv run python scripts/ingest_pdf.py --file path/to/manual.pdf [--sys-id <id>]
+uv run python scripts/ingest_pdf.py --file path/to/manual.pdf [--sys-id <id>]
 
 Per-page multimodal pipeline: each PDF page is rendered as an image (plus
 individually orientation-corrected crops of its embedded images) and sent to
