@@ -37,7 +37,7 @@ from openai import OpenAI
 from google.genai.errors import ClientError
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from barq_support.ingestion.embedder import embed_texts, EMBEDDING_BATCH_SIZE
+from barq_support.retrieval.embedder import embed_texts, EMBEDDING_BATCH_SIZE
 from barq_support.ingestion.qdrant_store import get_client, ensure_collection, upsert_chunks
 
 CHUNK_SIZE = 500
