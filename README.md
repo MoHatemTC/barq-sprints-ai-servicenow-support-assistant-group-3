@@ -90,6 +90,7 @@ QDRANT_COLLECTION=kb_articles
 AGENT_MAX_ITERATIONS=5
 
 # --- Langfuse Tracing (Optional / S3.4) ---
+# Set both keys to enable tracing; leave both empty to disable it.
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
