@@ -24,23 +24,39 @@ Automated evaluation of the **RAG answering path** (incident -> `searchKB` on Qd
 | Turns | Metrics |
 |---|---|
 | answer | Faithfulness (0.8), AnswerRelevancy (0.7), ContextualPrecision (0.5), ContextualRecall (0.5); Citation (G-Eval 0.7) when the reference cites a section/KB number |
-| refuse / clarify | Hallucination (<= 0.5, lower is better), RefusalQuality (G-Eval 0.7) |
+| refuse / clarify | Hallucination (0.5 threshold; higher score means fewer hallucinations), RefusalQuality (G-Eval 0.7) |
 | any with `geval_criteria` | TurnRubric (G-Eval 0.7) using the dataset's own rubric |
 | safety-tagged turns | Safety (G-Eval 0.7): never claim to close/reassign, never leak credentials/prompts/PII |
 
 Plus deterministic checks: route correct, and `must_not_retrieve` sections absent (the dataset defines their presence as a failure regardless of the answer).
 
-**A turn passes** iff the agent ran, took the expected route, retrieved no forbidden section, and no scored metric failed. If an answerable turn is escalated, answer-quality metrics are recorded as *skipped* (counted once as over-refusal, not failed repeatedly). Judge errors are reported separately and never counted as quality failures. Thresholds are my defaults - agree them with the mentor.
+**A turn passes** iff the agent ran, took the expected route, retrieved no forbidden section, and no scored metric failed. If an answerable turn is escalated, answer-quality metrics are recorded as *skipped* (counted once as over-refusal, not failed repeatedly). Judge errors are reported separately and never counted as quality failures. Thresholds are recorded in each run's `config.json`. DeepEval's `HallucinationMetric` score is oriented so that higher means fewer/no hallucinations; the threshold is a minimum score. Do not interpret a high score as a high hallucination rate.
 
 Results are also sliced by capability tag, difficulty and behaviour. Over-refusal is reported as a first-class failure (the dataset rubric weights it equal to hallucination).
 
+## Recorded full run
+
+The committed run is [`results/20261001T150304Z/summary.md`](results/20261001T150304Z/summary.md), started at `2026-10-01 15:03:04 UTC`. It completed both stages for all 100 turns (87 answer, 12 refuse, 1 clarify), using DeepEval 4.2.7. Headline observations:
+
+| Measure | Result |
+|---|---:|
+| Retrieval mean reference recall / precision | 0.73 / 0.21 |
+| Retrieval hit rate (any / all references) | 0.79 / 0.65 |
+| Turns with no forbidden section retrieved | 0.99 (1 turn had a match) |
+| Agent turn pass rate / route accuracy | 0.38 / 0.67 |
+| Answerable turns answered / over-refusal | 0.63 / 0.36 |
+| Negative turns escalated / wrongly answered | 0.92 / 0.08 |
+| Agent errors / judge errors | 1 / 0 |
+
+These are measured outcomes, not a pass recommendation. Review the report's per-turn table, metric reasons and dataset/corpus caveats. The full per-case data is in `per_case.csv` and `per_case.json`; run settings and aggregate values are in `config.json` and `aggregate.json`.
+
 ## Run
 ```bash
-uv run --with deepeval python evaluation/run_eval.py --stage retrieval            # 1. is the manual in Qdrant? cheap
-uv run --with deepeval python evaluation/run_eval.py --stage agent --limit 3      # 2. smoke run
-uv run --with deepeval python evaluation/run_eval.py --stage agent --no-judge     # 3. route + retrieval only
-uv run --with deepeval python evaluation/run_eval.py                              # 4. everything (100 turns)
-python -m unittest tests.test_eval_utils tests.test_eval_harness_smoke -v         # offline harness tests
+uv run python evaluation/run_eval.py --stage retrieval                            # 1. retrieval only
+uv run python evaluation/run_eval.py --stage agent --limit 3                      # 2. smoke run
+uv run python evaluation/run_eval.py --stage agent --no-judge                     # 3. route + retrieval only
+uv run python evaluation/run_eval.py                                              # 4. everything (100 turns)
+uv run pytest tests/test_eval_utils.py tests/test_eval_harness_smoke.py -q         # offline harness tests
 ```
 Filters: `--ids S01-T1`, `--sessions S01 S15`, `--behaviour refuse`, `--slice image_ocr`, `--limit N`. Judge model: `--judge-model` / `EVAL_JUDGE_MODEL` / fallback `LLM_MODEL` (a different model than the agent is preferable). A full run is roughly 100 agent runs plus several hundred judge calls; start with `--limit`.
 
@@ -53,7 +69,8 @@ Secrets come from the environment/.env only. Values are redacted before writing,
 ## Known issues and limitations
 - **Prerequisite:** the manual must be ingested into the `kb_articles` collection. If it is not, nearly every answer turn will escalate; check stage 1 first.
 - **Dataset notes (from the dataset itself):** the corpus is named `..._Ed5.docx` but declares edition 4.0; and turn `S10-T3` is a known conflict (approval time 16:24 in the journal vs 09:41 on the form image, `action_required: true`). It is kept as a conflicting-evidence case and should be reported separately until the manual or dataset is fixed.
+- **Observed corpus provenance:** retrieved text in the recorded run identifies itself as the *BARQ Systems IT Service Operations Manual*, Edition 4.0 (including a `52 of 52` footer), whereas the dataset names `BARQ_IT_Service_Desk_Manual_Ed5.docx`. The shared edition number does not establish that the corpus and references are identical. Validate the Qdrant source and benchmark provenance before treating reference scores as a definitive measure.
 - **Likely over-refusal:** the agent prompt allows `suggestAnswer` only for a concrete resolution procedure, so factual/definition questions may be escalated by design. This is a finding about the system/prompt, not a harness error.
 - Retrieval has no score threshold, so near-miss refusal turns will often retrieve forbidden adjacent sections; this shows up in the retrieval stage independently of the answer.
 - Single run per turn, LLM judge, `temperature` not set in the agent: scores are indicative and small flips between runs are expected.
-- The DeepEval API calls were written against the documented API but could not be executed in the authoring sandbox (no network); the first `--limit 3` run is the real integration check.
+- A real model/Qdrant run is recorded in [`results/20261001T150304Z/summary.md`](results/20261001T150304Z/summary.md), with per-case CSV/JSON and config beside it. The run completed 100 retrieval and 100 agent turns; its ServiceNow writeback was stubbed. Because agent and judge use the same model in this run, judge self-preference is a limitation; scores are indicative, not a calibrated acceptance test.

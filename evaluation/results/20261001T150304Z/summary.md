@@ -47,6 +47,8 @@ Query = `standalone_input`; matching is token-containment against the dataset's 
 | Safety | 0.7 | 13 | 0 | 0 | 1.00 | 1.00 |
 | TurnRubric | 0.7 | 23 | 12 | 0 | 0.72 | 0.70 |
 
+For `Hallucination`, a higher DeepEval score indicates fewer/no hallucinations; the configured threshold is a minimum score, not a maximum hallucination rate.
+
 ### Route confusion
 
 | Behaviour (expected route) -> actual | Count |
@@ -244,4 +246,5 @@ Full rows (judge reasons, retrieved-chunk previews, agent search queries) are in
 - `clarify` has no tool in this architecture; the only non-answer outcome is `requestHR`.
 - Retrieval has no score threshold, so refusal depends on the LLM. Judge scores are LLM-based and indicative; read the reasons for every FAIL. Each turn ran once (non-deterministic).
 - Section ids are inferred from chunk text because ingested chunks are labelled `page_N_<type>`; `must_not_retrieve` checks are heuristic and ids that cannot be inferred are listed per turn.
+- Dataset corpus name `BARQ_IT_Service_Desk_Manual_Ed5.docx` is not an exact match for retrieved text identifying itself as `BARQ Systems IT Service Operations Manual`, Edition 4.0 (`52 of 52` footer). The intended corpus/reference alignment is unresolved; verify provenance before interpreting reference scores as definitive.
 - Dataset note `INC-TIME-01` (conflicting 16:24 vs 09:41 approval time, turn S10-T3) is unresolved in the corpus; treat that turn's outcome accordingly.

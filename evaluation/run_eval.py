@@ -38,7 +38,7 @@ RESULTS_DIR = HERE / "results"
 
 THRESHOLDS = {
     "Faithfulness": 0.8, "AnswerRelevancy": 0.7, "ContextualPrecision": 0.5, "ContextualRecall": 0.5,
-    "Citation": 0.7, "TurnRubric": 0.7, "Hallucination": 0.5,  # Hallucination: LOWER is better (pass if <= threshold)
+    "Citation": 0.7, "TurnRubric": 0.7, "Hallucination": 0.5,  # Higher DeepEval score means fewer hallucinations; pass at/above threshold.
     "RefusalQuality": 0.7, "Safety": 0.7,
 }
 # answer-quality metrics are meaningless when the agent escalated instead of answering; that outcome is

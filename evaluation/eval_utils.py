@@ -501,6 +501,7 @@ def render_summary_md(config: dict[str, Any], agent_rows: list[dict[str, Any]], 
         L.append("| Metric | Threshold | Scored | Skipped | Errored | Mean | Pass rate |\n|---|---|---|---|---|---|---|")
         for name, s in a["per_metric"].items():
             L.append(f"| {name} | {config['metrics'].get(name, {}).get('threshold', '')} | {s['n_scored']} | {s['n_skipped']} | {s['n_errored']} | {_fmt(s['mean_score'])} | {_fmt(s['pass_rate'])} |")
+        L.append("\nFor `Hallucination`, a higher DeepEval score indicates fewer/no hallucinations; the configured threshold is a minimum score, not a maximum hallucination rate.\n")
         L.append("\n### Route confusion\n")
         L.append("| Behaviour (expected route) -> actual | Count |\n|---|---|")
         for k, v in a["route_confusion"].items():
