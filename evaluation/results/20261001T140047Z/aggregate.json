@@ -1,0 +1,362 @@
+{
+  "retrieval_stage": null,
+  "agent_stage": {
+    "n_turns": 100,
+    "n_answer": 87,
+    "n_negative": 13,
+    "n_agent_errors": 2,
+    "n_no_terminal_tool": 2,
+    "route_accuracy": 0.72,
+    "turn_pass_rate": 0.7,
+    "answer_turns_answered": 0.6782,
+    "over_refusal_rate": 0.2989,
+    "negative_turns_escalated": 1.0,
+    "false_answer_rate": 0.0,
+    "n_judge_errors": 0,
+    "per_metric": {},
+    "route_confusion": {
+      "answer (expect suggestAnswer) -> none": 2,
+      "answer (expect suggestAnswer) -> requestHR": 26,
+      "answer (expect suggestAnswer) -> suggestAnswer": 59,
+      "clarify (expect requestHR) -> requestHR": 1,
+      "refuse (expect requestHR) -> requestHR": 12
+    },
+    "slices": {
+      "absence_reasoning": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "acronym": {
+        "passed": 0,
+        "total": 2,
+        "rate": 0.0
+      },
+      "adversarial": {
+        "passed": 2,
+        "total": 3,
+        "rate": 0.667
+      },
+      "aggregation": {
+        "passed": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "ambiguity": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "arabic_rtl": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "authority_claim": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "behaviour:answer": {
+        "passed": 59,
+        "total": 87,
+        "rate": 0.678
+      },
+      "behaviour:clarify": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "behaviour:refuse": {
+        "passed": 10,
+        "total": 12,
+        "rate": 0.833
+      },
+      "bilingual": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "callout_text": {
+        "passed": 6,
+        "total": 7,
+        "rate": 0.857
+      },
+      "checkbox": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "comparison": {
+        "passed": 2,
+        "total": 4,
+        "rate": 0.5
+      },
+      "coreference": {
+        "passed": 6,
+        "total": 8,
+        "rate": 0.75
+      },
+      "counterfactual": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "cross_lingual": {
+        "passed": 1,
+        "total": 2,
+        "rate": 0.5
+      },
+      "cross_reference": {
+        "passed": 3,
+        "total": 3,
+        "rate": 1.0
+      },
+      "dark_theme": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "deduplication": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "definition": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "difficulty:easy": {
+        "passed": 19,
+        "total": 25,
+        "rate": 0.76
+      },
+      "difficulty:hard": {
+        "passed": 17,
+        "total": 28,
+        "rate": 0.607
+      },
+      "difficulty:medium": {
+        "passed": 34,
+        "total": 47,
+        "rate": 0.723
+      },
+      "ellipsis": {
+        "passed": 12,
+        "total": 14,
+        "rate": 0.857
+      },
+      "enumeration": {
+        "passed": 11,
+        "total": 15,
+        "rate": 0.733
+      },
+      "exception": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "false_premise": {
+        "passed": 3,
+        "total": 5,
+        "rate": 0.6
+      },
+      "floating_object_layout": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "footnote": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "form_parsing": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "front_matter": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "identifier_fidelity": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "image_ocr": {
+        "passed": 1,
+        "total": 5,
+        "rate": 0.2
+      },
+      "key_value_extraction": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "marginal_notes_layout": {
+        "passed": 0,
+        "total": 2,
+        "rate": 0.0
+      },
+      "multi_hop": {
+        "passed": 10,
+        "total": 13,
+        "rate": 0.769
+      },
+      "near_miss": {
+        "passed": 2,
+        "total": 2,
+        "rate": 1.0
+      },
+      "nested_table": {
+        "passed": 1,
+        "total": 4,
+        "rate": 0.25
+      },
+      "noisy_input": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "numeric": {
+        "passed": 3,
+        "total": 4,
+        "rate": 0.75
+      },
+      "ordering": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "page_crossing_table": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "partial_ambiguity": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "pii": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "policy": {
+        "passed": 9,
+        "total": 10,
+        "rate": 0.9
+      },
+      "procedure": {
+        "passed": 5,
+        "total": 5,
+        "rate": 1.0
+      },
+      "prompt_injection": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "pull_quote": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "reasoning": {
+        "passed": 2,
+        "total": 4,
+        "rate": 0.5
+      },
+      "recovery_after_refusal": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "rotated_image": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "scan_many_chunks": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "scope_boundary": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "single_hop": {
+        "passed": 2,
+        "total": 6,
+        "rate": 0.333
+      },
+      "structure": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "table_fullwidth_note": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "table_lookup": {
+        "passed": 24,
+        "total": 26,
+        "rate": 0.923
+      },
+      "table_merged_header": {
+        "passed": 2,
+        "total": 2,
+        "rate": 1.0
+      },
+      "table_rowspan": {
+        "passed": 2,
+        "total": 6,
+        "rate": 0.333
+      },
+      "temporal": {
+        "passed": 2,
+        "total": 2,
+        "rate": 1.0
+      },
+      "topic_shift": {
+        "passed": 2,
+        "total": 3,
+        "rate": 0.667
+      },
+      "two_column_layout": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "typo_robustness": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "unanswerable": {
+        "passed": 5,
+        "total": 7,
+        "rate": 0.714
+      },
+      "version_conflict": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "version_filter": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      }
+    }
+  }
+}

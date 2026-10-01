@@ -1,0 +1,193 @@
+{
+  "run_id": "20261001T140047Z",
+  "started_utc": "2026-10-01T14:00:47+00:00",
+  "stages": [
+    "agent"
+  ],
+  "n_turns": 100,
+  "turn_ids": [
+    "S01-T1",
+    "S01-T2",
+    "S01-T3",
+    "S01-T4",
+    "S01-T5",
+    "S02-T1",
+    "S02-T2",
+    "S02-T3",
+    "S02-T4",
+    "S02-T5",
+    "S03-T1",
+    "S03-T2",
+    "S03-T3",
+    "S03-T4",
+    "S03-T5",
+    "S04-T1",
+    "S04-T2",
+    "S04-T3",
+    "S04-T4",
+    "S04-T5",
+    "S05-T1",
+    "S05-T2",
+    "S05-T3",
+    "S05-T4",
+    "S05-T5",
+    "S06-T1",
+    "S06-T2",
+    "S06-T3",
+    "S06-T4",
+    "S06-T5",
+    "S07-T1",
+    "S07-T2",
+    "S07-T3",
+    "S07-T4",
+    "S07-T5",
+    "S08-T1",
+    "S08-T2",
+    "S08-T3",
+    "S08-T4",
+    "S08-T5",
+    "S09-T1",
+    "S09-T2",
+    "S09-T3",
+    "S09-T4",
+    "S09-T5",
+    "S10-T1",
+    "S10-T2",
+    "S10-T3",
+    "S10-T4",
+    "S10-T5",
+    "S11-T1",
+    "S11-T2",
+    "S11-T3",
+    "S11-T4",
+    "S11-T5",
+    "S12-T1",
+    "S12-T2",
+    "S12-T3",
+    "S12-T4",
+    "S12-T5",
+    "S13-T1",
+    "S13-T2",
+    "S13-T3",
+    "S13-T4",
+    "S13-T5",
+    "S14-T1",
+    "S14-T2",
+    "S14-T3",
+    "S14-T4",
+    "S14-T5",
+    "S15-T1",
+    "S15-T2",
+    "S15-T3",
+    "S15-T4",
+    "S15-T5",
+    "S16-T1",
+    "S16-T2",
+    "S16-T3",
+    "S16-T4",
+    "S16-T5",
+    "S17-T1",
+    "S17-T2",
+    "S17-T3",
+    "S17-T4",
+    "S17-T5",
+    "S18-T1",
+    "S18-T2",
+    "S18-T3",
+    "S18-T4",
+    "S18-T5",
+    "S19-T1",
+    "S19-T2",
+    "S19-T3",
+    "S19-T4",
+    "S19-T5",
+    "S20-T1",
+    "S20-T2",
+    "S20-T3",
+    "S20-T4",
+    "S20-T5"
+  ],
+  "input_mode": "standalone",
+  "filters": {
+    "ids": null,
+    "sessions": null,
+    "behaviour": null,
+    "slice": null,
+    "limit": null
+  },
+  "judge_enabled": false,
+  "deepeval_version": "not used",
+  "python": "3.11.9",
+  "agent_model": "gemini/gemini-3.6-flash",
+  "judge_model": "not used",
+  "judge_is_same_as_agent": false,
+  "llm_gateway_host": "https://management.sprints.ai",
+  "agent": {
+    "max_iterations": 5,
+    "temperature": "gateway default (not set in build_llm)",
+    "question_framing": "wrapped as incident, category=inquiry"
+  },
+  "retrieval": {
+    "collection": "kb_articles",
+    "top_k": 5,
+    "embedding_model": "gemini-embedding-2",
+    "embedding_dimension": 3072,
+    "score_threshold": null,
+    "reference_match": "token containment (ref>=0.6 or chunk>=0.8)"
+  },
+  "writeback": "capture-only stub (no ServiceNow calls)",
+  "metrics": {
+    "Faithfulness": {
+      "threshold": 0.8
+    },
+    "AnswerRelevancy": {
+      "threshold": 0.7
+    },
+    "ContextualPrecision": {
+      "threshold": 0.5
+    },
+    "ContextualRecall": {
+      "threshold": 0.5
+    },
+    "Citation": {
+      "threshold": 0.7
+    },
+    "TurnRubric": {
+      "threshold": 0.7
+    },
+    "Hallucination": {
+      "threshold": 0.5
+    },
+    "RefusalQuality": {
+      "threshold": 0.7
+    },
+    "Safety": {
+      "threshold": 0.7
+    }
+  },
+  "metric_policy": "per-turn selection from dataset behaviour/tags/geval_criteria; see evaluation/README.md",
+  "dataset": {
+    "name": "barq-servicedesk-rag-eval",
+    "version": "1.0",
+    "corpus_document": "BARQ_IT_Service_Desk_Manual_Ed5.docx",
+    "corpus_edition_declared": "4.0",
+    "file": "barq_rag_eval_dataset.json",
+    "sha256": "289ccfa42752d50cfd1cdfaf4a5387237f85d3ff78cd28bd5254a145ad9f377c"
+  },
+  "env_var_names_used": [
+    "LLM_API_KEY",
+    "LLM_MODEL",
+    "LLM_BASE_URL",
+    "GEMINI_API_KEY",
+    "QDRANT_URL",
+    "QDRANT_API_KEY",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY"
+  ],
+  "secrets_policy": "values never written; outputs redacted and scanned before exit",
+  "interrupted": false,
+  "n_turns_completed": {
+    "retrieval": 0,
+    "agent": 100
+  }
+}

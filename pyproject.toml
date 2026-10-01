@@ -37,6 +37,7 @@ dependencies = [
     "tenacity>=9.1.4",
     "redis>=5.2.0",
     "uvicorn[standard]>=0.34.0",
+    "deepeval>=4.2.7",
 ]
 
 [dependency-groups]
