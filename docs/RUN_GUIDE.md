@@ -27,6 +27,8 @@ Fill in `.env` locally. Keep the Qdrant collection set to `kb_articles`: ingesti
 | Variable(s) | Required for | Notes |
 |---|---|---|
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Agent and evaluation | The evaluation judge uses this gateway unless `EVAL_JUDGE_MODEL` / `--judge-model` overrides the model. |
+| `PASSWORD_CLASSIFIER_BASE_URL` | Incident password classification | Private vLLM server root URL (for example, `http://localhost:8001`) serving `Qwen/Qwen2.5-1.5B-Instruct`; supports `/tokenize` and `/v1/chat/completions`. `PASSWORD_CLASSIFIER_API_KEY` is optional. The vLLM tokenizer endpoint is not covered by vLLM's `--api-key` protection; keep the service on a trusted private network or protect it with a reverse proxy. |
+| `PASSWORD_CLASSIFIER_MODEL`, `PASSWORD_CLASSIFIER_TIMEOUT_SECONDS` | Incident password classification | Defaults to `Qwen/Qwen2.5-1.5B-Instruct` and 10 seconds. Configure the model name to match the vLLM served model. |
 | `GEMINI_API_KEY` | Retrieval and ingestion | Used directly by the Gemini embedding client; the embedding model is `gemini-embedding-2`, output dimension 3072. |
 | `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION` | Retrieval and ingestion | Keep the collection name `kb_articles` because retrieval does not read the configurable collection setting. |
 | `SERVICENOW_INSTANCE_URL`, `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD` | Live ServiceNow access | Use a least-privilege integration user. These are unnecessary for offline tests and the DeepEval capture stub. |
@@ -48,6 +50,32 @@ Fill in `.env` locally. Keep the Qdrant collection set to `kb_articles`: ingesti
    | `x_2215697_ai_ser_0.webhook.secret` | Same private value as `SERVICENOW_WEBHOOK_SECRET` in `.env` |
 
 4. Ensure the scoped incident table fields referenced in [`servicenow.py`](../src/barq_support/servicenow.py) exist and are accessible through the Table API, including AI status, suggested response, confidence, processed flag and human-review flag.
+
+Serve the classifier separately from the backend, for example with vLLM on a private host. vLLM is not an application dependency, so do not add it to this project's `pyproject.toml`. The upstream vLLM package requires Linux and does not support native Windows; run it in WSL2 with a compatible GPU setup or on a Linux host, following the [vLLM installation guide](https://docs.vllm.ai/en/stable/getting_started/installation/gpu/). If WSL reports that `wsl2.processors` exceeds the available logical processors, edit `%UserProfile%\.wslconfig` in Windows to set `[wsl2]` and `processors=8` (or remove the `processors` entry), then run `wsl --shutdown` in PowerShell and reopen the Linux distribution.
+
+Use a full supported Linux distribution such as Ubuntu in WSL, not a minimal shell/container distribution. Check the current distribution with `cat /etc/os-release`; vLLM needs Python 3.10–3.13 and a compatible GPU. In Ubuntu, install vLLM in its own fresh environment (do not use the app's environment):
+
+```bash
+sudo apt update
+sudo apt install -y curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source "$HOME/.local/bin/env"
+uv venv --python 3.12 --seed --managed-python
+source .venv/bin/activate
+uv pip install vllm --torch-backend=auto
+```
+
+If `nvidia-smi` is unavailable in WSL or the machine has no compatible GPU, vLLM's documented GPU installation will not work; use a compatible Linux GPU host or choose another classifier service.
+
+After installation, start the server from the Ubuntu/WSL shell (where `vllm` was installed), not directly from Windows PowerShell:
+
+```bash
+vllm serve Qwen/Qwen2.5-1.5B-Instruct --host 0.0.0.0 --port 8001 --api-key "<private-token>"
+```
+
+In PowerShell, `\` is not a line-continuation character; use a single line or PowerShell's backtick (`` ` ``) if you split a command there.
+
+Set `PASSWORD_CLASSIFIER_BASE_URL` to the vLLM service root as reachable from the Celery worker. When the classifier flags a credential, the existing OpenAI-compatible chat model (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`) performs redaction; cleaned incident fields are rechecked before they are written to ServiceNow or passed to the support agent. The same check runs on KB text/metadata before embedding or Qdrant upsert, and on search text before embedding. Classifier/model failures stop processing rather than forwarding unredacted text. Existing Qdrant points and embedding-cache entries are not retroactively scrubbed; purge the existing index and rebuild it from sanitized KB articles after deployment.
 
 The incident Business Rule gates on active status, supported categories, and the AI status/processed fields. The KB Business Rule emits events for published articles and deletes. See the [Architecture](ARCHITECTURE.md) for event contracts and caveats.
 

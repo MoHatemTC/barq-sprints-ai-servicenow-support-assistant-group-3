@@ -1,6 +1,8 @@
 from typing import Any, Optional
 
 from qdrant_client import QdrantClient
+from ..password_protection import sanitize_text_fields
+from ..settings import get_settings
 from qdrant_client.http import models
 
 from .embedder import embed_text
@@ -39,7 +41,11 @@ def search_kb(
     if not query.strip():
         raise ValueError("query must not be empty")
 
-    query_vector = embed_text(query)
+    sanitized_query = sanitize_text_fields(
+        {"query": query},
+        get_settings(),
+    )["query"]
+    query_vector = embed_text(sanitized_query)
 
     query_filter = None
 

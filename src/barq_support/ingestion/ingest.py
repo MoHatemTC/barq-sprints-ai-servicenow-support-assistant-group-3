@@ -22,6 +22,7 @@ from barq_support.ingestion.qdrant_store import (
     upsert_chunks,
     delete_article_chunks,
 )
+from barq_support.password_protection import sanitize_text_fields
 from barq_support.retrieval.embedder import embed_texts, EMBEDDING_BATCH_SIZE
 from barq_support.servicenow import ServiceNowClient
 from barq_support.settings import get_settings
@@ -44,13 +45,35 @@ def _article_to_chunks(article: dict[str, Any]) -> list[dict[str, Any]]:
     article_id = article.get("sys_id") or article.get("number", "unknown")
     text = article.get("text", "")
     metadata = {k: v for k, v in article.items() if k not in {"sys_id", "text"}}
-    return chunk_article(
+    chunks = chunk_article(
         article_id,
         text,
         metadata=metadata,
         chunk_size=settings.chunk_size,
         overlap=settings.chunk_overlap,
     )
+    for chunk in chunks:
+        text_fields = {
+            "text": chunk["text"],
+            "section": chunk["section"],
+        }
+        text_fields.update(
+            {
+                f"metadata.{key}": value
+                for key, value in chunk["metadata"].items()
+                if isinstance(value, str)
+            }
+        )
+        sanitized_fields = sanitize_text_fields(text_fields, settings)
+        chunk["text"] = sanitized_fields.pop("text")
+        chunk["section"] = sanitized_fields.pop("section")
+        sanitized_metadata = {}
+        for key, value in chunk["metadata"].items():
+            if isinstance(value, str):
+                value = sanitized_fields[f"metadata.{key}"]
+            sanitized_metadata[key] = value
+        chunk["metadata"] = sanitized_metadata
+    return chunks
 
 
 def _embed_with_cache(chunks: list[dict[str, Any]]) -> list[list[float]]:

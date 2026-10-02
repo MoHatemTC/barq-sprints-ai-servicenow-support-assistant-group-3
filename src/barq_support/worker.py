@@ -5,6 +5,9 @@ from qdrant_client import QdrantClient
 
 from .agent.agent import run_agent
 from .incident import IncidentEvent
+from .password_protection import (
+    sanitize_text_fields,
+)
 from .servicenow import ServiceNowClient
 from .settings import get_settings
 
@@ -93,6 +96,23 @@ def process_incident(event_payload: dict) -> dict:
             response=incident_response,
             fallback_sys_id=event.sys_id,
         )
+
+        incident_fields = {
+            "short_description": incident["short_description"],
+            "description": incident["description"],
+        }
+        redacted_fields = sanitize_text_fields(incident_fields, settings)
+        if redacted_fields != incident_fields:
+            servicenow.redact_incident_fields(
+                sys_id=incident["sys_id"],
+                fields=redacted_fields,
+            )
+            incident.update(redacted_fields)
+            logger.info(
+                "Redacted password-like values from incident %s fields=%s",
+                incident["number"],
+                ",".join(redacted_fields),
+            )
 
         logger.info(
             "Incident preloaded: number=%s sys_id=%s",

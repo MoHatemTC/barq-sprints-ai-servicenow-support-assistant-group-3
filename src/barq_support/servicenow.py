@@ -69,6 +69,21 @@ class ServiceNowClient:
             json={"work_notes": note},
         )
 
+    def redact_incident_fields(
+        self,
+        sys_id: str,
+        fields: dict[str, str],
+    ) -> dict[str, Any]:
+        allowed_fields = {"short_description", "description"}
+        if not fields or not set(fields).issubset(allowed_fields):
+            raise ValueError("Only non-empty incident description fields may be redacted")
+
+        return self._request(
+            "PATCH",
+            f"/api/now/table/incident/{sys_id}",
+            json=fields,
+        )
+
     def suggest_answer(
         self,
         sys_id: str,
