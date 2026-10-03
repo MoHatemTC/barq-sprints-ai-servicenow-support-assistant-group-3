@@ -31,12 +31,33 @@ Requires Python 3.11+, `uv`, Redis, Qdrant, and credentials for the LLM and Gemi
 
 ```powershell
 uv sync
-Copy-Item .env.example .env
-uv run uvicorn barq_support.main:app --port 8000
+copy .env.example .env
 ```
 
-In separate terminals, start Redis-backed worker and (for ServiceNow callbacks) an HTTPS tunnel as described in the guide. To reproduce the full quality run after configuring model and Qdrant credentials:
+Configure the environment variables in `.env` (LLM, ServiceNow, Qdrant, Celery/Redis, and Langfuse). See [Run Guide](docs/RUN_GUIDE.md) for full configuration details.
 
+### Running the Services (3 Terminals)
+
+Ensure the local Redis service is running on port `6379`. Then open **three separate terminals** in the project root:
+
+#### Terminal 1: FastAPI Webhook Receiver (Uvicorn)
+```powershell
+uv run uvicorn barq_support.main:app --port 8000
+```
+*Listens on `http://127.0.0.1:8000`. Exposes `/health` and `/api/v1/events/servicenow`.*
+
+#### Terminal 2: Celery Worker
+```powershell
+uv run celery -A barq_support.celery_app worker --loglevel=info --pool=solo
+```
+*Processes queued incident and KB events asynchronously using the `solo` execution pool on Windows.*
+
+#### Terminal 3: ngrok Tunnel
+```powershell
+ngrok http 8000 --url=https://<your-subdomain>.ngrok-free.app
+```
+
+To run the DeepEval evaluation harness:
 ```powershell
 uv run python evaluation/run_eval.py
 ```
