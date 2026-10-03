@@ -39,6 +39,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from barq_support.retrieval.embedder import embed_texts, EMBEDDING_BATCH_SIZE
 from barq_support.ingestion.qdrant_store import get_client, ensure_collection, upsert_chunks
+from barq_support.password_protection import sanitize_chunk_fields
+from barq_support.settings import Settings, get_settings
 
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
@@ -270,6 +272,13 @@ def build_pdf_chunks(
     return chunks
 
 
+def sanitize_pdf_chunks(chunks: list[dict], settings: Settings) -> list[dict]:
+    """Redact chunk text and metadata before writing inspection output or vectors."""
+    for chunk in chunks:
+        sanitize_chunk_fields(chunk, settings)
+    return chunks
+
+
 def embed_with_retry(texts: list[str], max_retries: int = 5) -> list[list[float]]:
     for attempt in range(max_retries):
         try:
@@ -328,7 +337,12 @@ def main():
 
     print(f"[*] Extracted {len(page_markdowns)}/{len(pages)} non-empty pages. Merging and chunking...")
 
-    chunks = build_pdf_chunks(page_markdowns, article_id, original_filename, args.sys_id)
+    settings = get_settings()
+    chunks = sanitize_pdf_chunks(
+        build_pdf_chunks(page_markdowns, article_id, original_filename, args.sys_id),
+        settings,
+    )
+
     n_tables = sum(1 for c in chunks if c["metadata"]["chunk_type"] == "table")
     n_diagrams = sum(1 for c in chunks if c["metadata"]["chunk_type"] == "diagram")
     n_text = sum(1 for c in chunks if c["metadata"]["chunk_type"] == "text")

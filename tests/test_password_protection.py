@@ -1,15 +1,17 @@
+from copy import deepcopy
 from unittest.mock import Mock, patch
 
 import pytest
 
+from barq_support.ingestion import ingest
 from barq_support.password_protection import (
-    _label_token_ids,
     classify_password_presence,
+    sanitize_chunk_fields,
     sanitize_text_fields,
 )
-from barq_support.ingestion import ingest
 from barq_support.retrieval import retriever
 from barq_support.worker import process_incident
+from scripts.ingest_pdf import sanitize_pdf_chunks
 
 
 class FakeResponse:
@@ -23,175 +25,219 @@ class FakeResponse:
         return self.payload
 
 
-def test_classifier_compares_true_and_false_label_logits():
+def test_classifier_reads_binary_result_from_local_gpu_service():
     settings = Mock(
-        password_classifier_base_url="http://vllm:8000/v1",
-        password_classifier_api_key="test-key",
-        password_classifier_model="Qwen/Qwen2.5-1.5B-Instruct",
+        password_classifier_base_url="http://host.docker.internal:8114/",
+        password_classifier_api_key="test-classifier-key",
         password_classifier_timeout_seconds=5.0,
     )
-    _label_token_ids.cache_clear()
-    tokenize_responses = [
-        {"tokens": [1, 2]},
-        {"tokens": [1, 2, 31]},
-        {"tokens": [1, 2, 46]},
-    ]
-    score_response = {
-        "choices": [
-            {
-                "logprobs": {
-                    "content": [
-                        {
-                            "top_logprobs": [
-                                {"token": "token_id:31", "logprob": -0.2},
-                                {"token": "token_id:46", "logprob": -1.6},
-                            ]
-                        }
-                    ]
-                }
-            }
-        ]
-    }
-
     with patch(
         "barq_support.password_protection.httpx.post",
-        side_effect=[
-            *(FakeResponse(payload) for payload in tokenize_responses),
-            FakeResponse(score_response),
-        ],
-    ) as post:
-        found = classify_password_presence("Password: hunter2", settings)
-
-    assert found is True
-    assert post.call_count == 4
-    score_call = post.call_args
-    assert score_call.args[0] == "http://vllm:8000/v1/chat/completions"
-    assert score_call.kwargs["json"]["logprob_token_ids"] == [31, 46]
-    assert score_call.kwargs["json"]["max_tokens"] == 1
-    assert score_call.kwargs["headers"]["Authorization"] == "Bearer test-key"
-
-
-def test_classifier_returns_false_when_false_label_has_higher_logit():
-    settings = Mock(
-        password_classifier_base_url="http://vllm:8000",
-        password_classifier_api_key="",
-        password_classifier_model="Qwen/Qwen2.5-1.5B-Instruct",
-        password_classifier_timeout_seconds=5.0,
-    )
-    _label_token_ids.cache_clear()
-    responses = [
-        FakeResponse({"tokens": [1, 2]}),
-        FakeResponse({"tokens": [1, 2, 31]}),
-        FakeResponse({"tokens": [1, 2, 46]}),
-        FakeResponse(
-            {
-                "choices": [
-                    {
-                        "logprobs": {
-                            "content": [
-                                {
-                                    "top_logprobs": [
-                                        {"token": "token_id:31", "logprob": -1.6},
-                                        {"token": "token_id:46", "logprob": -0.2},
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
+        return_value=FakeResponse(
+            {"contains_secret": True, "true_probability": 0.91}
         ),
-    ]
+    ) as post:
+        assert classify_password_presence("Password: hunter2", settings) is True
 
+    post.assert_called_once()
+    assert post.call_args.args[0] == "http://host.docker.internal:8114/classify"
+    assert post.call_args.kwargs["json"] == {"text": "Password: hunter2"}
+    assert post.call_args.kwargs["headers"] == {
+        "Authorization": f"Bearer {settings.password_classifier_api_key}"
+    }
+    assert post.call_args.kwargs["timeout"] == 5.0
+
+
+def test_classifier_returns_false_for_safe_text():
+    settings = Mock(
+        password_classifier_base_url="http://classifier:8114",
+        password_classifier_api_key="test-classifier-key",
+        password_classifier_timeout_seconds=5.0,
+    )
     with patch(
         "barq_support.password_protection.httpx.post",
-        side_effect=responses,
+        return_value=FakeResponse(
+            {"contains_secret": False, "true_probability": 0.03}
+        ),
     ):
         assert classify_password_presence("Login fails.", settings) is False
 
 
-def test_classifier_requires_single_token_labels():
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {"contains_secret": "false", "true_probability": 0.2},
+        {"contains_secret": False, "true_probability": float("nan")},
+        {"contains_secret": False, "true_probability": 1.2},
+        {"contains_secret": False, "true_probability": 0.2, "extra": True},
+        {"contains_secret": True, "true_probability": 0.2},
+    ],
+)
+def test_classifier_fails_closed_on_invalid_response(payload):
     settings = Mock(
-        password_classifier_base_url="http://vllm:8000",
-        password_classifier_api_key="",
-        password_classifier_model="Qwen/Qwen2.5-1.5B-Instruct",
+        password_classifier_base_url="http://classifier:8114",
+        password_classifier_api_key="test-classifier-key",
         password_classifier_timeout_seconds=5.0,
     )
-    _label_token_ids.cache_clear()
-
     with (
         patch(
             "barq_support.password_protection.httpx.post",
-            side_effect=[
-                FakeResponse({"tokens": [1, 2]}),
-                FakeResponse({"tokens": [1, 2, 3, 4]}),
-            ],
+            return_value=FakeResponse(payload),
         ),
-        pytest.raises(RuntimeError, match="exactly one model token"),
+        pytest.raises(RuntimeError),
     ):
         classify_password_presence("Password: value", settings)
 
 
-def test_sanitize_text_fields_masks_and_verifies_with_classifier():
+def test_sanitize_text_fields_redacts_known_credentials_before_classifying():
     fields = {
         "short_description": "Unable to log in",
-        "description": "The password is hunter2.",
-    }
-    masked_fields = {
-        "short_description": "Unable to log in",
-        "description": "The password is [REDACTED].",
-    }
-    settings = Mock()
-    llm = Mock()
-    structured_llm = Mock()
-    structured_llm.invoke.return_value.model_dump.return_value = {
-        "field_0": masked_fields["short_description"],
-        "field_1": masked_fields["description"],
-    }
-    llm.with_structured_output.return_value = structured_llm
-
-    with (
-        patch(
-            "barq_support.password_protection.classify_password_presence",
-            side_effect=[True, False],
-        ) as classify,
-        patch(
-            "barq_support.password_protection.build_llm",
-            return_value=llm,
+        "description": (
+            "I tried to change my password from OLD-TEST-ONLY to "
+            "NEW-TEST-ONLY but it keeps raising an error."
         ),
-    ):
+    }
+    settings = Mock(
+        password_classifier_base_url="http://classifier:8114",
+        password_classifier_api_key="test-classifier-key",
+        password_classifier_timeout_seconds=5.0,
+    )
+    with patch(
+        "barq_support.password_protection.httpx.post",
+        return_value=FakeResponse(
+            {"contains_secret": False, "true_probability": 0.01}
+        ),
+    ) as post:
         result = sanitize_text_fields(fields, settings)
 
-    assert result == masked_fields
-    assert classify.call_count == 2
-    schema = llm.with_structured_output.call_args.args[0]
-    assert set(schema.model_fields) == {"field_0", "field_1"}
-    human_message = structured_llm.invoke.call_args.args[0][1]
-    assert "hunter2" in human_message.content
+    assert result == {
+        "short_description": "Unable to log in",
+        "description": (
+            "I tried to change my password from [REDACTED] to "
+            "[REDACTED] but it keeps raising an error."
+        ),
+    }
+    post.assert_called_once()
+    classifier_input = post.call_args.kwargs["json"]["text"]
+    assert "OLD-TEST-ONLY" not in classifier_input
+    assert "NEW-TEST-ONLY" not in classifier_input
 
 
-def test_sanitize_text_fields_rejects_unchanged_mask_result():
+def test_sanitize_text_fields_fails_closed_when_secret_cannot_be_located():
     fields = {
         "short_description": "Unable to log in",
-        "description": "The password is hunter2.",
+        "description": "The credential appeared somewhere in the request.",
     }
-    llm = Mock()
-    structured_llm = Mock()
-    structured_llm.invoke.return_value.model_dump.return_value = {
-        "field_0": fields["short_description"],
-        "field_1": fields["description"],
-    }
-    llm.with_structured_output.return_value = structured_llm
-
+    settings = Mock(
+        password_classifier_base_url="http://classifier:8114",
+        password_classifier_api_key="test-classifier-key",
+        password_classifier_timeout_seconds=5.0,
+    )
     with (
-        patch("barq_support.password_protection.build_llm", return_value=llm),
         patch(
-            "barq_support.password_protection.classify_password_presence",
-            return_value=True,
+            "barq_support.password_protection.httpx.post",
+            return_value=FakeResponse(
+                {"contains_secret": True, "true_probability": 0.99}
+            ),
         ),
-        pytest.raises(RuntimeError, match="original text unchanged"),
+        pytest.raises(RuntimeError, match="patterns could not locate"),
     ):
-        sanitize_text_fields(fields, Mock())
+        sanitize_text_fields(fields, settings)
+
+
+def test_sanitize_text_fields_redacts_labeled_secret_without_llm_rewrite():
+    fields = {
+        "short_description": "Password reset",
+        "description": 'The password is "hunter2".',
+    }
+    settings = Mock(
+        password_classifier_base_url="http://classifier:8114",
+        password_classifier_api_key="test-classifier-key",
+        password_classifier_timeout_seconds=5.0,
+    )
+    responses = [
+        {"contains_secret": True, "true_probability": 0.98},
+        {"contains_secret": False, "true_probability": 0.02},
+    ]
+    with patch(
+        "barq_support.password_protection.httpx.post",
+        side_effect=[FakeResponse(item) for item in responses],
+    ) as post:
+        result = sanitize_text_fields(fields, settings)
+
+    assert result == {
+        "short_description": "Password reset",
+        "description": "The password is [REDACTED].",
+    }
+    assert post.call_count == 2
+    assert "hunter2" in post.call_args_list[0].kwargs["json"]["text"]
+    assert "hunter2" not in post.call_args_list[1].kwargs["json"]["text"]
+
+
+def test_sanitize_chunk_fields_redacts_text_and_string_metadata():
+    chunk = {
+        "text": "Password: hunter2",
+        "section": "Resolution",
+        "metadata": {
+            "short_description": "Use password hunter2",
+            "page_number": 2,
+        },
+    }
+    settings = Mock()
+
+    with patch(
+        "barq_support.password_protection.sanitize_text_fields",
+        return_value={
+            "text": "Password: [REDACTED]",
+            "section": "Resolution",
+            "metadata.short_description": "Use password [REDACTED]",
+        },
+    ) as sanitize:
+        sanitize_chunk_fields(chunk, settings)
+
+    sanitize.assert_called_once_with(
+        {
+            "text": "Password: hunter2",
+            "section": "Resolution",
+            "metadata.short_description": "Use password hunter2",
+        },
+        settings,
+    )
+    assert chunk == {
+        "text": "Password: [REDACTED]",
+        "section": "Resolution",
+        "metadata": {
+            "short_description": "Use password [REDACTED]",
+            "page_number": 2,
+        },
+    }
+
+
+def test_pdf_chunks_are_sanitized_with_the_shared_chunk_guard():
+    chunks = [
+        {
+            "text": "Password: secret",
+            "section": "page_1_text",
+            "metadata": {"source_type": "pdf"},
+        }
+    ]
+    settings = Mock()
+
+    def redact_pdf_chunk(chunk, passed_settings):
+        assert passed_settings is settings
+        chunk["text"] = "Password: [REDACTED]"
+
+    with patch(
+        "scripts.ingest_pdf.sanitize_chunk_fields",
+        side_effect=redact_pdf_chunk,
+    ) as sanitize:
+        result = sanitize_pdf_chunks(chunks, settings)
+
+    assert result is chunks
+    assert chunks[0]["text"] == "Password: [REDACTED]"
+    sanitize.assert_called_once_with(chunks[0], settings)
 
 
 def test_process_incident_masks_and_persists_before_running_agent():
@@ -290,22 +336,26 @@ def test_kb_chunks_are_sanitized_before_embedding_or_upsert():
         "chunk_index": 0,
         "metadata": {"short_description": "Password reset guide"},
     }
-    sanitized_fields = {
-        "text": "Password: [REDACTED]",
-        "section": "Resolution",
-        "metadata.short_description": "Password reset guide",
-    }
-    expected_sanitized_fields = sanitized_fields.copy()
+    observed_fields = {}
+
+    def redact_chunk(chunk, passed_settings):
+        assert passed_settings is settings
+        observed_fields.update(
+            text=chunk["text"],
+            section=chunk["section"],
+            metadata=chunk["metadata"].copy(),
+        )
+        chunk["text"] = "Password: [REDACTED]"
 
     with (
         patch("barq_support.ingestion.ingest.get_settings", return_value=settings),
         patch(
             "barq_support.ingestion.ingest.chunk_article",
-            return_value=[raw_chunk.copy()],
+            return_value=[deepcopy(raw_chunk)],
         ) as chunk_article,
         patch(
-            "barq_support.ingestion.ingest.sanitize_text_fields",
-            return_value=sanitized_fields,
+            "barq_support.ingestion.ingest.sanitize_chunk_fields",
+            side_effect=redact_chunk,
         ) as sanitize,
     ):
         chunks = ingest._article_to_chunks(
@@ -317,18 +367,13 @@ def test_kb_chunks_are_sanitized_before_embedding_or_upsert():
         )
 
     chunk_article.assert_called_once()
-    sanitize.assert_called_once_with(
-        {
-            "text": "Password: secret",
-            "section": "Resolution",
-            "metadata.short_description": "Password reset guide",
-        },
-        settings,
-    )
-    assert chunks[0]["text"] == expected_sanitized_fields["text"]
-    assert chunks[0]["metadata"]["short_description"] == (
-        expected_sanitized_fields["metadata.short_description"]
-    )
+    sanitize.assert_called_once()
+    assert observed_fields == {
+        "text": raw_chunk["text"],
+        "section": raw_chunk["section"],
+        "metadata": raw_chunk["metadata"],
+    }
+    assert chunks[0]["text"] == "Password: [REDACTED]"
 
 
 def test_search_query_is_sanitized_before_embedding():

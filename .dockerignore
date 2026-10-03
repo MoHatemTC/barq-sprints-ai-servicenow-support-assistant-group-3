@@ -1,0 +1,18 @@
+.git
+.venv
+__pycache__
+*.pyc
+.env
+docs
+screenshots
+tests
+evaluation
+.deepeval
+test
+New folder
+*.zip
+body.json
+check_hmac.py
+inspection_output.md
+run_a.py
+/test_webhook.py

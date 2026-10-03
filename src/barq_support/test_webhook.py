@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-import requests
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,7 +28,7 @@ payload = {
 body = json.dumps(payload).encode("utf-8")
 sig = hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
 
-resp = requests.post(
+resp = httpx.post(
     url,
     data=body,
     headers={"Content-Type": "application/json", "X-Signature": sig},

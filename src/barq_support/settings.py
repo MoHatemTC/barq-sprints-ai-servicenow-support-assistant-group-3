@@ -16,12 +16,9 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="")
     llm_base_url: str = Field(default="")
 
-    # Password classifier (vLLM)
+    # Local GPU password classifier
     password_classifier_base_url: str = Field(default="")
     password_classifier_api_key: str = Field(default="")
-    password_classifier_model: str = Field(
-        default="Qwen/Qwen2.5-1.5B-Instruct"
-    )
     password_classifier_timeout_seconds: float = Field(default=10.0, gt=0)
 
     # ServiceNow
