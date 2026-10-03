@@ -8,6 +8,7 @@ This guide takes a clean checkout to a local backend and explains how to verify 
 - Redis reachable by the API and Celery worker (the default is `redis://localhost:6379/0`).
 - A Qdrant instance with access to the `kb_articles` collection.
 - An OpenAI-compatible chat-completion endpoint plus model/API key (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`).
+- Ollama running on the Docker host with the configured classifier model pulled.
 - Gemini API key for `gemini-embedding-2` embeddings (`GEMINI_API_KEY`).
 - For live incident/KB processing: a ServiceNow instance with the scoped app and custom incident fields used by this project.
 - For ServiceNow-to-local callbacks: a public HTTPS tunnel such as ngrok. This is not needed for unit tests or DeepEval's capture-only writeback.
@@ -27,15 +28,15 @@ Fill in `.env` locally. Keep the Qdrant collection set to `kb_articles`: ingesti
 | Variable(s) | Required for | Notes |
 |---|---|---|
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Agent and evaluation | The evaluation judge uses this gateway unless `EVAL_JUDGE_MODEL` / `--judge-model` overrides the model. |
-| `PASSWORD_CLASSIFIER_BASE_URL`, `PASSWORD_CLASSIFIER_API_KEY` | Local password classification | URL and bearer key for the separate GPU classifier service. With Docker Desktop and the service on Windows, use `http://host.docker.internal:8114`; `localhost` inside a container refers to that container. |
-| `PASSWORD_CLASSIFIER_MODEL`, `PASSWORD_CLASSIFIER_TIMEOUT_SECONDS` | Local password classification | The separate service defaults to `Qwen/Qwen2.5-1.5B-Instruct`; the API call timeout defaults to 10 seconds. |
+| `PASSWORD_CLASSIFIER_BASE_URL`, `PASSWORD_CLASSIFIER_MODEL` | Ollama password classification | From Docker Desktop on Windows, use `http://host.docker.internal:11434`; the default model is `qwen2.5:1.5b`. |
+| `PASSWORD_CLASSIFIER_TIMEOUT_SECONDS` | Ollama password classification | Timeout for one Ollama request, in seconds; defaults to 120 to allow for model loading. |
 | `GEMINI_API_KEY` | Retrieval and ingestion | Used directly by the Gemini embedding client; the embedding model is `gemini-embedding-2`, output dimension 3072. |
 | `QDRANT_URL`, `QDRANT_API_KEY`, `QDRANT_COLLECTION` | Retrieval and ingestion | Keep the collection name `kb_articles` because retrieval does not read the configurable collection setting. |
 | `SERVICENOW_INSTANCE_URL`, `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD` | Live ServiceNow access | Use a least-privilege integration user. These are unnecessary for offline tests and the DeepEval capture stub. |
 | `SERVICENOW_WEBHOOK_SECRET` | Receiving ServiceNow callbacks | Must match the ServiceNow `x_2215697_ai_ser_0.webhook.secret` property. |
 | `REDIS_URL`, `CELERY_BROKER_URL` | API and worker | Point both services to the same Redis database. |
 | `CELERY_RESULT_BACKEND` | Optional Celery results | Set this to empty in `.env` (the example file contains a Redis URL); application results are written to ServiceNow and task results are ignored. |
-| `AGENT_MAX_ITERATIONS` | Agent | Optional; defaults to 5. |
+| `AGENT_MAX_ITERATIONS` | Agent | Optional; defaults to 5. The agent searches once per incident; after retrieval, only `suggestAnswer` and `requestHR` remain available. |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | Optional tracing | The configured host variable is `LANGFUSE_HOST`. |
 
 ## 3. Configure ServiceNow (live integration only)
@@ -51,53 +52,74 @@ Fill in `.env` locally. Keep the Qdrant collection set to `kb_articles`: ingesti
 
 4. Ensure the scoped incident table fields referenced in [`servicenow.py`](../src/barq_support/servicenow.py) exist and are accessible through the Table API, including AI status, suggested response, confidence, processed flag and human-review flag.
 
-Run the password classifier as a separate GPU service on the Windows host. This keeps PyTorch and Transformers out of the API/worker Docker images.
+### Configure the Ollama password classifier
 
-1. Install the NVIDIA driver and verify the GPU is available with `nvidia-smi`.
-2. Create a dedicated Python environment:
+The API and worker call Ollama on the Docker host. Ollama uses Qwen to classify
+the incident text; the backend masks supported credential formats locally and
+fails closed if the model detects a credential the local rules cannot locate.
+No second model call is used to rewrite the text.
 
-   ```powershell
-   uv venv .venv-classifier --python 3.11 --seed
-   .\.venv-classifier\Scripts\Activate.ps1
-   ```
-
-3. Install a CUDA-enabled PyTorch build using the command recommended by the [official PyTorch installer selector](https://pytorch.org/get-started/locally/) in this activated environment. Do not install the CPU-only build. Then install the remaining classifier dependencies:
+1. Install and start Ollama on the host machine. Pull the configured model:
 
    ```powershell
-   python -m pip install -r classifier-requirements.txt
+   ollama pull qwen2.5:1.5b
    ```
-   The first model launch downloads the Hugging Face model weights. Set `HF_HOME` before launch if you want those weights stored on a drive with more free space.
-4. Set the application values in `.env`:
 
-```dotenv
-PASSWORD_CLASSIFIER_BASE_URL=http://host.docker.internal:8114
-PASSWORD_CLASSIFIER_API_KEY=<same-long-random-key-in-both-processes>
-PASSWORD_CLASSIFIER_MODEL=Qwen/Qwen2.5-1.5B-Instruct
-PASSWORD_CLASSIFIER_TIMEOUT_SECONDS=10
-```
+2. In the application project's `.env`, configure:
 
-The classifier listens on all host interfaces so Docker Desktop can reach it. Protect it with a private API key, restrict port 8114 to the private network in Windows Defender Firewall, and do not expose or port-forward it to the public internet. Start it in a separate PowerShell window from the repository root, using the same `.env`:
+   ```dotenv
+   PASSWORD_CLASSIFIER_BASE_URL=http://host.docker.internal:11434
+   PASSWORD_CLASSIFIER_MODEL=qwen2.5:1.5b
+   PASSWORD_CLASSIFIER_TIMEOUT_SECONDS=120
+   ```
 
-```powershell
-.\.venv-classifier\Scripts\python.exe scripts\password_classifier_server.py
-```
-
-Verify that the model loaded on the GPU and that Docker can reach the service:
-
-```powershell
-Invoke-RestMethod http://localhost:8114/health
-docker compose exec worker curl -fsS http://host.docker.internal:8114/health
-```
-
-Recreate the API and worker after changing `.env`:
+   `host.docker.internal` lets Docker Desktop containers reach the host. If
+   Ollama is bound only to loopback and the containers cannot connect, configure
+   Ollama to listen on an address reachable from Docker and restrict that
+   listener with your host firewall. Do not expose the Ollama port publicly.
+   Remove obsolete `PASSWORD_CLASSIFIER_SPACE_ID` and
+   `PASSWORD_CLASSIFIER_HF_TOKEN` settings.
+3. From PowerShell in the application project folder, recreate the API and
+   worker so they load the new environment:
 
 ```powershell
+docker compose --progress plain build api worker
 docker compose up -d --force-recreate api worker
 ```
 
-The classifier performs one model forward pass and compares the next-token logits for `true` and `false`; it generates no response token. The returned `true_probability` is a softmax over those two label logits, not a calibrated real-world risk estimate. The application makes one local classifier request for ordinary text and redacts known password-change and explicit credential-assignment formats with local regular expressions. If the classifier still flags a credential after supported redaction rules, processing fails closed rather than sending the incident to the support agent. No second LLM is called to rewrite the incident. This is not a guarantee that every possible credential format will be recognized; evaluate false-positive/false-negative rates against representative, synthetic test data before production. The same classifier and redaction gate is used for ServiceNow KB and PDF chunk text/metadata before inspection output, embedding, or Qdrant upsert, and for search text before embedding. The support agent itself still uses the separately configured `LLM_BASE_URL`/`LLM_MODEL` provider. Existing incidents, Qdrant points, PDF inspection files, and embedding-cache entries are not retroactively scrubbed; redact affected records and purge/rebuild stored content from sanitized sources after deployment.
+4. Verify the backend can call Ollama:
+
+   ```powershell
+   docker compose exec worker /app/.venv/bin/python -c "from barq_support.password_protection import classify_password_presence; from barq_support.settings import get_settings; print(classify_password_presence('Synthetic printer connectivity check; no credentials included.', get_settings()))"
+   ```
+
+   This checks connectivity and response parsing, not model accuracy. It should
+   print `False` for the synthetic safe example. Review worker logs for
+   connection or model errors.
+
+Ollama generates a constrained JSON boolean classification; unlike the direct
+next-token-logit method, this approach generates a short response. Known
+password-change and explicit credential-assignment formats are masked locally.
+If the classifier flags a credential that the local rules cannot locate,
+processing fails closed instead of forwarding that text to the support agent.
+The raw incident text is sent to the configured Ollama server for detection,
+so keep Ollama on a trusted, access-controlled host. These rules do not
+guarantee detection or redaction of every credential format; evaluate false
+positives and false negatives with representative synthetic data before
+production. The same classifier/redaction gate is used for KB and PDF chunks
+and search text. Existing incidents and stored Qdrant/PDF/cache data are not
+retroactively scrubbed.
 
 The incident Business Rule gates on active status, supported categories, and the AI status/processed fields. The KB Business Rule emits events for published articles and deletes. See the [Architecture](ARCHITECTURE.md) for event contracts and caveats.
+
+### Optional: ServiceNow runbook upload dashboard
+
+For manager-uploaded PDF runbooks and automatic ingestion, follow the complete
+[Runbook Upload Dashboard guide](RUNBOOK_DASHBOARD.md). It covers the Runbook
+table/list-form module, access controls, `sys_attachment` Business Rule,
+webhook properties, and end-to-end verification. The backend also needs
+`SERVICENOW_ATTACHMENT_MAX_BYTES` (default 25 MiB) and a ServiceNow integration
+user authorized to download attachments.
 
 ## 4. Load knowledge into Qdrant
 

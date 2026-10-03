@@ -5,6 +5,7 @@ BARQ G3 is a human-reviewed Tier-1 support assistant. ServiceNow sends eligible 
 ## Start here
 
 - [Run Guide](docs/RUN_GUIDE.md) — prerequisites, environment configuration, ServiceNow setup, startup and verification.
+- [Runbook Upload Dashboard](docs/RUNBOOK_DASHBOARD.md) — optional ServiceNow PDF upload, signed attachment event, and automatic Qdrant ingestion.
 - [Architecture](docs/ARCHITECTURE.md) — implemented event paths, component responsibilities and known limitations.
 - [Decision Log](docs/DECISION_LOG.md) — operational choices visible in the merged implementation and the evaluation.
 - [DeepEval Evaluation Guide](evaluation/README.md) — dataset, harness, metrics, execution and interpretation.

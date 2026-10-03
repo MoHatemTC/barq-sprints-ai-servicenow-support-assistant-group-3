@@ -47,4 +47,3 @@ packages = ["src/barq_support"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-

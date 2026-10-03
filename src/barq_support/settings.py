@@ -16,15 +16,16 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="")
     llm_base_url: str = Field(default="")
 
-    # Local GPU password classifier
+    # Ollama password classifier
     password_classifier_base_url: str = Field(default="")
-    password_classifier_api_key: str = Field(default="")
-    password_classifier_timeout_seconds: float = Field(default=10.0, gt=0)
+    password_classifier_model: str = Field(default="qwen2.5:1.5b")
+    password_classifier_timeout_seconds: float = Field(default=120.0, gt=0)
 
     # ServiceNow
     servicenow_instance_url: str = Field(default="")
     servicenow_username: str = Field(default="")
     servicenow_password: str = Field(default="")
+    servicenow_runbook_table: str = Field(default="x_2215697_ai_ser_0_runbook_upload")
 
     # Qdrant
     qdrant_url: str = Field(default="")
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     # Webhook & Dedup
     servicenow_webhook_secret: str = Field(default="")
     webhook_dedup_ttl_seconds: int = Field(default=86400)
+    servicenow_attachment_max_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
 
     # Redis & Celery
     redis_url: str = Field(default="redis://localhost:6379/0")

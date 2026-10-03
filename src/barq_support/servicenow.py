@@ -173,3 +173,78 @@ class ServiceNowClient:
             },
         )
         return resp.get("result", [])
+
+    def download_attachment(
+        self,
+        attachment_sys_id: str,
+        max_bytes: int,
+    ) -> bytes:
+        """Stream one ServiceNow attachment, stopping if it exceeds max_bytes."""
+        if len(attachment_sys_id) != 32 or any(
+            char not in "0123456789abcdefABCDEF" for char in attachment_sys_id
+        ):
+            raise ValueError("attachment_sys_id must be a 32-character ServiceNow sys_id")
+        if max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
+
+        url = f"{self.base_url}/api/now/attachment/{attachment_sys_id}/file"
+        for attempt in range(2):
+            try:
+                with httpx.stream(
+                    "GET",
+                    url,
+                    auth=self.auth,
+                    headers={"Accept": "application/pdf"},
+                    timeout=60.0,
+                ) as response:
+                    if (
+                        response.status_code == 429 or response.status_code >= 500
+                    ) and attempt == 0:
+                        time.sleep(1)
+                        continue
+                    response.raise_for_status()
+
+                    content_length = response.headers.get("Content-Length")
+                    if content_length and int(content_length) > max_bytes:
+                        raise ValueError(
+                            f"ServiceNow attachment exceeds the {max_bytes}-byte limit"
+                        )
+
+                    content = bytearray()
+                    for chunk in response.iter_bytes():
+                        content.extend(chunk)
+                        if len(content) > max_bytes:
+                            raise ValueError(
+                                f"ServiceNow attachment exceeds the {max_bytes}-byte limit"
+                            )
+                    return bytes(content)
+            except (httpx.TimeoutException, httpx.NetworkError):
+                if attempt == 0:
+                    time.sleep(1)
+                    continue
+                raise
+
+        raise RuntimeError("ServiceNow attachment download failed after one retry")
+
+    def update_runbook_upload(
+        self,
+        record_sys_id: str,
+        status_value: str,
+        notes: str,
+    ) -> dict[str, Any]:
+        """Write ingestion status to the configured ServiceNow runbook record."""
+        if len(record_sys_id) != 32 or any(
+            char not in "0123456789abcdefABCDEF" for char in record_sys_id
+        ):
+            raise ValueError("record_sys_id must be a 32-character ServiceNow sys_id")
+        if status_value not in {"Processing", "Ingested", "Failed"}:
+            raise ValueError("Invalid runbook ingestion status")
+
+        return self._request(
+            "PATCH",
+            f"/api/now/table/{self.settings.servicenow_runbook_table}/{record_sys_id}",
+            json={
+                "status": status_value,
+                "ingestion_notes": notes[:500],
+            },
+        )

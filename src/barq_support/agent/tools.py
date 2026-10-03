@@ -151,8 +151,8 @@ def build_tools(
         func=search_kb_tool,
         name="searchKB",
         description=(
-            "Search the ServiceNow knowledge base using dense vector retrieval. "
-            "This tool is repeatable and non-terminal."
+            "Search the ServiceNow knowledge base once using dense vector "
+            "retrieval. After this search, choose suggestAnswer or requestHR."
         ),
         args_schema=SearchKBInput,
     )

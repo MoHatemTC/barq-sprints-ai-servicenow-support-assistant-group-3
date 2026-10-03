@@ -14,77 +14,75 @@ from barq_support.worker import process_incident
 from scripts.ingest_pdf import sanitize_pdf_chunks
 
 
-class FakeResponse:
-    def __init__(self, payload):
-        self.payload = payload
-
-    def raise_for_status(self):
-        return None
-
-    def json(self):
-        return self.payload
-
-
-def test_classifier_reads_binary_result_from_local_gpu_service():
+def test_classifier_calls_ollama_chat_endpoint():
     settings = Mock(
-        password_classifier_base_url="http://host.docker.internal:8114/",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
+        password_classifier_base_url="http://ollama:11434",
+        password_classifier_model="qwen2.5:1.5b",
+        password_classifier_timeout_seconds=120.0,
     )
+    response = Mock()
+    response.json.return_value = {
+        "message": {"content": '{"contains_secret": true}'}
+    }
     with patch(
         "barq_support.password_protection.httpx.post",
-        return_value=FakeResponse(
-            {"contains_secret": True, "true_probability": 0.91}
-        ),
+        return_value=response,
     ) as post:
         assert classify_password_presence("Password: hunter2", settings) is True
 
+    response.raise_for_status.assert_called_once_with()
     post.assert_called_once()
-    assert post.call_args.args[0] == "http://host.docker.internal:8114/classify"
-    assert post.call_args.kwargs["json"] == {"text": "Password: hunter2"}
-    assert post.call_args.kwargs["headers"] == {
-        "Authorization": f"Bearer {settings.password_classifier_api_key}"
+    args, kwargs = post.call_args
+    assert args == ("http://ollama:11434/api/chat",)
+    assert kwargs["json"]["model"] == "qwen2.5:1.5b"
+    assert kwargs["json"]["messages"][-1] == {
+        "role": "user",
+        "content": "Password: hunter2",
     }
-    assert post.call_args.kwargs["timeout"] == 5.0
+    assert kwargs["json"]["format"]["required"] == ["contains_secret"]
+    assert kwargs["json"]["stream"] is False
+    assert kwargs["timeout"] == 120.0
 
 
 def test_classifier_returns_false_for_safe_text():
     settings = Mock(
-        password_classifier_base_url="http://classifier:8114",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
+        password_classifier_base_url="http://ollama:11434",
+        password_classifier_model="qwen2.5:1.5b",
+        password_classifier_timeout_seconds=120.0,
     )
+    response = Mock()
+    response.json.return_value = {
+        "message": {"content": '{"contains_secret": false}'}
+    }
     with patch(
         "barq_support.password_protection.httpx.post",
-        return_value=FakeResponse(
-            {"contains_secret": False, "true_probability": 0.03}
-        ),
+        return_value=response,
     ):
         assert classify_password_presence("Login fails.", settings) is False
 
 
 @pytest.mark.parametrize(
-    "payload",
+    "content",
     [
-        None,
-        [],
-        {"contains_secret": "false", "true_probability": 0.2},
-        {"contains_secret": False, "true_probability": float("nan")},
-        {"contains_secret": False, "true_probability": 1.2},
-        {"contains_secret": False, "true_probability": 0.2, "extra": True},
-        {"contains_secret": True, "true_probability": 0.2},
+        "not-json",
+        "null",
+        "[]",
+        '{"contains_secret": "false"}',
+        '{"contains_secret": false, "extra": true}',
     ],
 )
-def test_classifier_fails_closed_on_invalid_response(payload):
+def test_classifier_fails_closed_on_invalid_response(content):
     settings = Mock(
-        password_classifier_base_url="http://classifier:8114",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
+        password_classifier_base_url="http://ollama:11434",
+        password_classifier_model="qwen2.5:1.5b",
+        password_classifier_timeout_seconds=120.0,
     )
+    response = Mock()
+    response.json.return_value = {"message": {"content": content}}
     with (
         patch(
             "barq_support.password_protection.httpx.post",
-            return_value=FakeResponse(payload),
+            return_value=response,
         ),
         pytest.raises(RuntimeError),
     ):
@@ -99,17 +97,11 @@ def test_sanitize_text_fields_redacts_known_credentials_before_classifying():
             "NEW-TEST-ONLY but it keeps raising an error."
         ),
     }
-    settings = Mock(
-        password_classifier_base_url="http://classifier:8114",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
-    )
+    settings = Mock()
     with patch(
-        "barq_support.password_protection.httpx.post",
-        return_value=FakeResponse(
-            {"contains_secret": False, "true_probability": 0.01}
-        ),
-    ) as post:
+        "barq_support.password_protection.classify_password_presence",
+        return_value=False,
+    ) as classify:
         result = sanitize_text_fields(fields, settings)
 
     assert result == {
@@ -119,10 +111,9 @@ def test_sanitize_text_fields_redacts_known_credentials_before_classifying():
             "[REDACTED] but it keeps raising an error."
         ),
     }
-    post.assert_called_once()
-    classifier_input = post.call_args.kwargs["json"]["text"]
-    assert "OLD-TEST-ONLY" not in classifier_input
-    assert "NEW-TEST-ONLY" not in classifier_input
+    classifier_input = classify.call_args.args[0]
+    assert "OLD-TEST-ONLY" in classifier_input
+    assert "NEW-TEST-ONLY" in classifier_input
 
 
 def test_sanitize_text_fields_fails_closed_when_secret_cannot_be_located():
@@ -130,50 +121,50 @@ def test_sanitize_text_fields_fails_closed_when_secret_cannot_be_located():
         "short_description": "Unable to log in",
         "description": "The credential appeared somewhere in the request.",
     }
-    settings = Mock(
-        password_classifier_base_url="http://classifier:8114",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
-    )
+    settings = Mock()
     with (
         patch(
-            "barq_support.password_protection.httpx.post",
-            return_value=FakeResponse(
-                {"contains_secret": True, "true_probability": 0.99}
-            ),
+            "barq_support.password_protection.classify_password_presence",
+            return_value=True,
         ),
         pytest.raises(RuntimeError, match="patterns could not locate"),
     ):
         sanitize_text_fields(fields, settings)
 
 
-def test_sanitize_text_fields_redacts_labeled_secret_without_llm_rewrite():
+def test_sanitize_text_fields_redacts_labeled_secret_locally():
     fields = {
         "short_description": "Password reset",
         "description": 'The password is "hunter2".',
     }
-    settings = Mock(
-        password_classifier_base_url="http://classifier:8114",
-        password_classifier_api_key="test-classifier-key",
-        password_classifier_timeout_seconds=5.0,
-    )
-    responses = [
-        {"contains_secret": True, "true_probability": 0.98},
-        {"contains_secret": False, "true_probability": 0.02},
-    ]
+    settings = Mock()
     with patch(
-        "barq_support.password_protection.httpx.post",
-        side_effect=[FakeResponse(item) for item in responses],
-    ) as post:
+        "barq_support.password_protection.classify_password_presence",
+        return_value=True,
+    ) as classify:
         result = sanitize_text_fields(fields, settings)
 
     assert result == {
         "short_description": "Password reset",
         "description": "The password is [REDACTED].",
     }
-    assert post.call_count == 2
-    assert "hunter2" in post.call_args_list[0].kwargs["json"]["text"]
-    assert "hunter2" not in post.call_args_list[1].kwargs["json"]["text"]
+    classify.assert_called_once()
+    assert "hunter2" in classify.call_args.args[0]
+
+
+def test_sanitize_single_field_does_not_add_classifier_label():
+    settings = Mock()
+    with patch(
+        "barq_support.password_protection.classify_password_presence",
+        return_value=False,
+    ) as classify:
+        result = sanitize_text_fields(
+            {"text": "VPN profile reset procedure."},
+            settings,
+        )
+
+    assert result == {"text": "VPN profile reset procedure."}
+    classify.assert_called_once_with("VPN profile reset procedure.", settings)
 
 
 def test_sanitize_chunk_fields_redacts_text_and_string_metadata():
@@ -182,6 +173,7 @@ def test_sanitize_chunk_fields_redacts_text_and_string_metadata():
         "section": "Resolution",
         "metadata": {
             "short_description": "Use password hunter2",
+            "attachment_sys_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
             "page_number": 2,
         },
     }
@@ -189,20 +181,19 @@ def test_sanitize_chunk_fields_redacts_text_and_string_metadata():
 
     with patch(
         "barq_support.password_protection.sanitize_text_fields",
-        return_value={
-            "text": "Password: [REDACTED]",
-            "section": "Resolution",
-            "metadata.short_description": "Use password [REDACTED]",
-        },
+        side_effect=[
+            {"text": "Password: [REDACTED]"},
+            {"metadata.short_description": "Use password [REDACTED]"},
+        ],
     ) as sanitize:
         sanitize_chunk_fields(chunk, settings)
 
-    sanitize.assert_called_once_with(
-        {
-            "text": "Password: hunter2",
-            "section": "Resolution",
-            "metadata.short_description": "Use password hunter2",
-        },
+    assert sanitize.call_args_list[0].args == (
+        {"text": "Password: hunter2"},
+        settings,
+    )
+    assert sanitize.call_args_list[1].args == (
+        {"metadata.short_description": "Use password hunter2"},
         settings,
     )
     assert chunk == {
@@ -210,6 +201,7 @@ def test_sanitize_chunk_fields_redacts_text_and_string_metadata():
         "section": "Resolution",
         "metadata": {
             "short_description": "Use password [REDACTED]",
+            "attachment_sys_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
             "page_number": 2,
         },
     }
