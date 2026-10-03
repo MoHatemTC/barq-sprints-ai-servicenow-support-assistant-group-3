@@ -65,21 +65,27 @@ def run_agent(
         max_iterations=settings.agent_max_iterations,
     )
 
-    # Initialize the Langfuse client so the LangChain callback
-    # can record the agent and tool-call traces.
-    Langfuse(
-        public_key=settings.langfuse_public_key,
-        secret_key=settings.langfuse_secret_key,
-        host=settings.langfuse_host,
-    )
+    public_key = settings.langfuse_public_key.strip()
+    secret_key = settings.langfuse_secret_key.strip()
+    if bool(public_key) != bool(secret_key):
+        raise ValueError(
+            "Both LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY must be set "
+            "to enable Langfuse tracing."
+        )
 
-    langfuse_client = get_client(
-        public_key=settings.langfuse_public_key,
-    )
-
-    langfuse_handler = CallbackHandler(
-        public_key=settings.langfuse_public_key,
-    )
+    langfuse_client = None
+    invoke_config: dict[str, Any] = {}
+    if public_key:
+        # Langfuse tracing is optional; only initialize its client when fully
+        # configured so an empty key does not create a disabled client.
+        Langfuse(
+            public_key=public_key,
+            secret_key=secret_key,
+            host=settings.langfuse_host,
+        )
+        langfuse_client = get_client(public_key=public_key)
+        langfuse_handler = CallbackHandler(public_key=public_key)
+        invoke_config = {"callbacks": [langfuse_handler]}
 
     result = agent.invoke(
         {
@@ -107,7 +113,7 @@ def run_agent(
                 }
             ]
         },
-        config={"callbacks": [langfuse_handler]},
+        config=invoke_config,
     )
 
     # Fail-safe: if the bounded agent loop ends without
@@ -134,6 +140,7 @@ def run_agent(
         result["s3_terminal_called"] = True
 
     # Ensure pending Langfuse traces are sent before returning.
-    langfuse_client.flush()
+    if langfuse_client is not None:
+        langfuse_client.flush()
 
     return result
