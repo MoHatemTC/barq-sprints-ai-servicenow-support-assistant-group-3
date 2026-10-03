@@ -1,0 +1,356 @@
+[
+  {
+    "turn_id": "S01-T1",
+    "session_id": "S01",
+    "behaviour": "answer",
+    "difficulty": "easy",
+    "requires": [
+      "single_hop"
+    ],
+    "tags": [
+      "factual",
+      "scope"
+    ],
+    "input_mode": "standalone",
+    "input": "What is this manual for and who is supposed to read it?",
+    "reference": "It is the working reference for everyone who handles an incident at BARQ: Tier 1 service desk analysts, the resolver groups they escalate to, the service owners who accept those escalations, and the delivery managers who report on the result. It states what has been agreed, how quickly, and who decides when the agreed answer does not fit. It is operational only — it does not describe architecture, justify tooling, or replace vendor documentation.",
+    "expected_route": "suggestAnswer",
+    "actual_route": "suggestAnswer",
+    "route_correct": true,
+    "confidence": 1.0,
+    "multiple_terminal_calls": false,
+    "actual_output": "Purpose of the Manual:\nThe BARQ Systems IT Service Operations Manual serves as the operational working reference for everyone handling incidents at BARQ Systems. It outlines agreed operational procedures, SLA targets, and decision-making authority when standard processes do not fit. It is strictly operational and does not cover system architecture, tooling choices, or replace vendor documentation.\n\nIntended Audience:\nThe manual is intended for anyone involved in incident management at BARQ Systems:\n- Tier 1 Service Desk Analysts: Primary focus on Sections 3, 4, 6, and end-to-end ticket handling in Section 7.\n- Resolver Groups: Primary focus on Sections 4, 5, and 8 (including the known error register before accepting escalations).\n- Service Owners: Primary focus on Sections 5, 9, and 10 (change acceptance criteria and major incident obligations).\n- Delivery Managers: Primary focus on Sections 3, 9, and 12 (SLA reporting and definitions).\n- New Joiners: Should read Sections 1 through 4 in their first week.\n\nSources:\n- cdda7be82f9b07502e0e5b707fa4e31f",
+    "agent_error": null,
+    "iterations": 3,
+    "budget_exhausted": false,
+    "latency_s": 16.35,
+    "top_retrieval_score": 0.79637134,
+    "n_chunks_retrieved": 5,
+    "n_searches": 1,
+    "search_queries": [
+      "What is this manual for and who is supposed to read it?"
+    ],
+    "retrieval": {
+      "ref_recall": 1.0,
+      "ref_precision": 0.4,
+      "hit_any": true,
+      "hit_all": true,
+      "sections_inferred": [
+        "1.1"
+      ],
+      "expected_sections_found": [
+        "1.1"
+      ],
+      "forbidden_retrieved": [],
+      "forbidden_uninferable": [],
+      "clean": true
+    },
+    "retrieved_chunks": [
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 3,
+        "section": "page_2_text",
+        "score": 0.79637134,
+        "text_preview": "Document control .......................................................................................................................................................5\n1. About this manual.............................................................................................................."
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 40,
+        "section": "page_6_text",
+        "score": 0.7642653,
+        "text_preview": "BARQ Systems · IT Service Operations Manual\nINTERNAL DOCUMENT\n\n# 1. About this manual\n\n## 1.1 Purpose and audience\n\nThis manual is the working reference for everyone who handles an incident at BARQ Systems: service desk analysts on Tier 1, the resolver groups they escalate to, the service owners who"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 42,
+        "section": "page_6_table",
+        "score": 0.7061523,
+        "text_preview": "| | |\n| --- | --- |\n| **Tier 1 analysts** | Sections 3, 4 and 6 are your working set. Section 7 shows what a well-handled ticket looks like end to end. |\n| **Resolver groups** | Sections 4, 5 and 8. Read the known error register before you accept an escalation — half of what reaches you is already d"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 41,
+        "section": "page_6_text",
+        "score": 0.6913302,
+        "text_preview": "It is deliberately operational. It does not describe architecture, it does not justify tooling choices, and it does not replace vendor documentation. Where a procedure depends on a system whose behaviour we do not control, the procedure says so and names the team who owns the relationship."
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 283,
+        "section": "page_52_text",
+        "score": 0.68991613,
+        "text_preview": "*End of manual. Edition 4.0, published 11 August 2026. Next scheduled review 10 August 2027.*\n\nEdition 4.0\n52 of 52 ·"
+      }
+    ],
+    "work_notes": [
+      "Searched KB for purpose and audience of the IT Service Operations Manual. Article cdda7be82f9b07502e0e5b707fa4e31f provides explicit purpose and target audience details."
+    ],
+    "metrics": {
+      "Faithfulness": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because the actual output is completely faithful to the retrieval context and contains no contradictions!",
+        "threshold": 0.8
+      },
+      "AnswerRelevancy": {
+        "score": 0.9,
+        "passed": true,
+        "reason": "The score is 0.90 because while the response answers what the manual is for and who should read it, it includes irrelevant administrative metadata.",
+        "threshold": 0.7
+      },
+      "ContextualPrecision": {
+        "score": 0.5,
+        "passed": true,
+        "reason": "The score is 0.50 because irrelevant nodes are ranked higher than relevant nodes. Specifically, the first node in retrieval contexts is irrelevant because \"This chunk is a table of contents listing section headers like '1.1 Purpose and audience' but contains no substantive details to answer the prompt.\", yet it is ranked above the second node in retrieval contexts, which is relevant as \"This chunk provides the direct answer explaining the purpose and audience, stating that 'This manual is the working reference for everyone who handles an incident at BARQ Systems: service desk analysts on Tier 1, the resolver groups they escalate to, the service owners who accept those escalations, and the delivery managers who report on the result.'\". Additionally, the third node in retrieval contexts is irrelevant because \"This chunk gives specific section reading instructions for roles, but the details in the expected output are derived directly from section 1.1 in Node 2 rather than this breakdown.\", but it is ranked higher than the fourth node in retrieval contexts, which is relevant because \"This chunk contains the explicit clarification of what the manual is for and what it excludes, directly supporting the expected output: 'It is deliberately operational. It does not describe architecture, it does not justify tooling choices, and it does not replace vendor documentation.'\".",
+        "threshold": 0.5
+      },
+      "ContextualRecall": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because all sentences in the expected output are fully supported by the retrieved context! Specifically, sentences 1 and 2 are backed by node 2 in retrieval context, and sentence 3 aligns perfectly with node 4.",
+        "threshold": 0.5
+      }
+    },
+    "passed": true
+  },
+  {
+    "turn_id": "S01-T2",
+    "session_id": "S01",
+    "behaviour": "answer",
+    "difficulty": "easy",
+    "requires": [
+      "table_lookup",
+      "coreference"
+    ],
+    "tags": [
+      "table",
+      "follow_up"
+    ],
+    "input_mode": "standalone",
+    "input": "Which sections of the manual should a new joiner read first?",
+    "reference": "Read Sections 1 to 4 in your first week. Do not read Section 6 end to end — it is a reference you will search, not memorise.",
+    "expected_route": "suggestAnswer",
+    "actual_route": "suggestAnswer",
+    "route_correct": true,
+    "confidence": 1.0,
+    "multiple_terminal_calls": false,
+    "actual_output": "According to the IT Service Operations Manual (BARQ_Operations_Manual.pdf):\n\n1. **Sections 1 to 4**: New joiners should read Sections 1 through 4 during their first week.\n2. **Section 6**: Do not read Section 6 end to end, as it is designed as a reference guide to be searched rather than memorized.\n\nSources:\n- cdda7be82f9b07502e0e5b707fa4e31f",
+    "agent_error": null,
+    "iterations": 3,
+    "budget_exhausted": false,
+    "latency_s": 79.07,
+    "top_retrieval_score": 0.7193163,
+    "n_chunks_retrieved": 5,
+    "n_searches": 1,
+    "search_queries": [
+      "new joiner manual sections to read first"
+    ],
+    "retrieval": {
+      "ref_recall": 1.0,
+      "ref_precision": 0.2,
+      "hit_any": true,
+      "hit_all": true,
+      "sections_inferred": [
+        "1.1",
+        "Appendix D"
+      ],
+      "expected_sections_found": [
+        "1.1"
+      ],
+      "forbidden_retrieved": [],
+      "forbidden_uninferable": [],
+      "clean": true
+    },
+    "retrieved_chunks": [
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 42,
+        "section": "page_6_table",
+        "score": 0.7193163,
+        "text_preview": "| | |\n| --- | --- |\n| **Tier 1 analysts** | Sections 3, 4 and 6 are your working set. Section 7 shows what a well-handled ticket looks like end to end. |\n| **Resolver groups** | Sections 4, 5 and 8. Read the known error register before you accept an escalation — half of what reaches you is already d"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 40,
+        "section": "page_6_text",
+        "score": 0.651911,
+        "text_preview": "BARQ Systems · IT Service Operations Manual\nINTERNAL DOCUMENT\n\n# 1. About this manual\n\n## 1.1 Purpose and audience\n\nThis manual is the working reference for everyone who handles an incident at BARQ Systems: service desk analysts on Tier 1, the resolver groups they escalate to, the service owners who"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 283,
+        "section": "page_52_text",
+        "score": 0.65127134,
+        "text_preview": "*End of manual. Edition 4.0, published 11 August 2026. Next scheduled review 10 August 2027.*\n\nEdition 4.0\n52 of 52 ·"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 43,
+        "section": "page_6_text",
+        "score": 0.6500529,
+        "text_preview": "## 1.2 How to find things\n\nEverything in this manual carries an identifier that is also searchable in the ticketing system. If you have the identifier, search there first — the record is live and this document is a snapshot."
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 276,
+        "section": "page_50_text",
+        "score": 0.6330992,
+        "text_preview": "BARQ Systems · IT Service Operations Manual **INTERNAL DOCUMENT**\n\n# Appendix D · Directory\n\nNames and roles as at the edition date. Extension numbers and the on-call rota are maintained in the ticketing system and are authoritative there; this table is for routing, not for dialling."
+      }
+    ],
+    "work_notes": [
+      "Found guidance in BARQ Operations Manual (article_id: cdda7be82f9b07502e0e5b707fa4e31f). New joiners should read Sections 1 to 4 in their first week, and avoid reading Section 6 end to end as it is intended as a reference to search."
+    ],
+    "metrics": {
+      "Faithfulness": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because there are no contradictions, meaning the output perfectly aligns with the retrieval context! Keep up the great work!",
+        "threshold": 0.8
+      },
+      "AnswerRelevancy": {
+        "score": 0.75,
+        "passed": true,
+        "reason": "The score is 0.75 because while the output answers which sections a new joiner should read first, it includes irrelevant source attribution metadata that does not help answer the question.",
+        "threshold": 0.7
+      },
+      "ContextualPrecision": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because the first node in retrieval contexts is perfectly ranked at the top, as it directly contains the answer under the 'New joiners' section: 'Read Sections 1 to 4 in your first week. Do not read Section 6 end to end — it is a reference, and you will search it, not remember it.', ensuring all irrelevant nodes are correctly placed lower in the rankings!",
+        "threshold": 0.5
+      },
+      "ContextualRecall": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because both sentences 1 and 2 of the expected output are fully supported by node 1 in retrieval context!",
+        "threshold": 0.5
+      }
+    },
+    "passed": true
+  },
+  {
+    "turn_id": "S01-T3",
+    "session_id": "S01",
+    "behaviour": "answer",
+    "difficulty": "easy",
+    "requires": [
+      "table_lookup",
+      "ellipsis"
+    ],
+    "tags": [
+      "table",
+      "follow_up"
+    ],
+    "input_mode": "standalone",
+    "input": "Which sections of the manual should resolver groups read?",
+    "reference": "Sections 4, 5 and 8. They should read the known error register before accepting an escalation, because roughly half of what reaches them is already documented.",
+    "expected_route": "suggestAnswer",
+    "actual_route": "suggestAnswer",
+    "route_correct": true,
+    "confidence": 1.0,
+    "multiple_terminal_calls": false,
+    "actual_output": "According to the BARQ IT Service Operations Manual (page 6 table):\n\nResolver groups should read Sections 4, 5, and 8. \n\nAdditionally, resolver groups should read the known error register before accepting an escalation, as half of what reaches them is already documented.\n\nSources:\n- cdda7be82f9b07502e0e5b707fa4e31f",
+    "agent_error": null,
+    "iterations": 3,
+    "budget_exhausted": false,
+    "latency_s": 9.09,
+    "top_retrieval_score": 0.65534556,
+    "n_chunks_retrieved": 5,
+    "n_searches": 1,
+    "search_queries": [
+      "resolver groups manual sections"
+    ],
+    "retrieval": {
+      "ref_recall": 1.0,
+      "ref_precision": 0.2,
+      "hit_any": true,
+      "hit_all": true,
+      "sections_inferred": [
+        "1.1",
+        "2.3",
+        "3.1",
+        "3.3",
+        "4.2",
+        "Appendix A",
+        "Appendix B",
+        "Appendix B.1",
+        "Appendix E",
+        "Document control"
+      ],
+      "expected_sections_found": [
+        "1.1"
+      ],
+      "forbidden_retrieved": [],
+      "forbidden_uninferable": [],
+      "clean": true
+    },
+    "retrieved_chunks": [
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 42,
+        "section": "page_6_table",
+        "score": 0.65534556,
+        "text_preview": "| | |\n| --- | --- |\n| **Tier 1 analysts** | Sections 3, 4 and 6 are your working set. Section 7 shows what a well-handled ticket looks like end to end. |\n| **Resolver groups** | Sections 4, 5 and 8. Read the known error register before you accept an escalation — half of what reaches you is already d"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 40,
+        "section": "page_6_text",
+        "score": 0.629297,
+        "text_preview": "BARQ Systems · IT Service Operations Manual\nINTERNAL DOCUMENT\n\n# 1. About this manual\n\n## 1.1 Purpose and audience\n\nThis manual is the working reference for everyone who handles an incident at BARQ Systems: service desk analysts on Tier 1, the resolver groups they escalate to, the service owners who"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 54,
+        "section": "page_9_table",
+        "score": 0.62044084,
+        "text_preview": "| Role | Description |\n| --- | --- |\n| **Tier 1 analyst** | Owns the incident from creation to resolution or handover. Applies documented knowledge, keeps the requester informed, and escalates on the clock rather than on frustration. An analyst may not close an incident they escalated without confir"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 263,
+        "section": "page_47_text",
+        "score": 0.6185588,
+        "text_preview": "BARQ Systems · IT Service Operations Manual\nINTERNAL DOCUMENT\n\n# Appendix B · Templates\n\n## B.1 Escalation handover\n\nPaste into the work note when escalating. A resolver group may reject an escalation that does not carry these five things.\n\n```text\nESCALATION — <group>"
+      },
+      {
+        "article_id": "cdda7be82f9b07502e0e5b707fa4e31f",
+        "chunk_index": 279,
+        "section": "page_51_text",
+        "score": 0.61589634,
+        "text_preview": "# Appendix E · Identifier index\n\n*Every record identifier used in this manual, against the sections it appears in. Search the ticketing system for the live record; this index tells you where the context is written down.*"
+      }
+    ],
+    "work_notes": [
+      "Found manual guidance for resolver groups in article cdda7be82f9b07502e0e5b707fa4e31f (BARQ Operations Manual, page 6 table). Resolver groups should read Sections 4, 5, and 8."
+    ],
+    "metrics": {
+      "Faithfulness": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because the actual output aligns perfectly with the retrieval context without any contradictions!",
+        "threshold": 0.8
+      },
+      "AnswerRelevancy": {
+        "score": 0.5,
+        "passed": false,
+        "reason": "The score is 0.50 because the output includes irrelevant metadata and general context about issue volumes rather than directly identifying which sections of the manual the resolver groups should read.",
+        "threshold": 0.7
+      },
+      "ContextualPrecision": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because the most relevant node directly answering which sections resolver groups should read is perfectly ranked right at the top in the first context!",
+        "threshold": 0.5
+      },
+      "ContextualRecall": {
+        "score": 1.0,
+        "passed": true,
+        "reason": "The score is 1.00 because sentences 1 and 2 in the expected output are completely supported by node 1 in retrieval context. Great job on retrieving all the right information!",
+        "threshold": 0.5
+      }
+    },
+    "passed": false
+  }
+]

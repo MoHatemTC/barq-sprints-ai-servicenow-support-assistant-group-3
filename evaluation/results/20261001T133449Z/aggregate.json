@@ -1,0 +1,13 @@
+{
+  "retrieval_stage": {
+    "n_turns": 100,
+    "n_with_reference": 95,
+    "mean_ref_recall": 0.7272,
+    "mean_ref_precision": 0.2105,
+    "hit_any_rate": 0.7895,
+    "hit_all_rate": 0.6526,
+    "clean_rate": 0.99,
+    "n_with_forbidden_sections": 1
+  },
+  "agent_stage": null
+}

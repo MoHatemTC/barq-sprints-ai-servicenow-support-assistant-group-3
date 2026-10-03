@@ -1,0 +1,86 @@
+{
+  "retrieval_stage": null,
+  "agent_stage": {
+    "n_turns": 3,
+    "n_answer": 3,
+    "n_negative": 0,
+    "n_agent_errors": 0,
+    "n_no_terminal_tool": 0,
+    "route_accuracy": 1.0,
+    "turn_pass_rate": 0.6667,
+    "answer_turns_answered": 1.0,
+    "over_refusal_rate": 0.0,
+    "negative_turns_escalated": null,
+    "false_answer_rate": null,
+    "n_judge_errors": 0,
+    "per_metric": {
+      "AnswerRelevancy": {
+        "n_scored": 3,
+        "n_passed": 2,
+        "n_errored": 0,
+        "n_skipped": 0,
+        "mean_score": 0.7167,
+        "pass_rate": 0.6667
+      },
+      "ContextualPrecision": {
+        "n_scored": 3,
+        "n_passed": 3,
+        "n_errored": 0,
+        "n_skipped": 0,
+        "mean_score": 0.8333,
+        "pass_rate": 1.0
+      },
+      "ContextualRecall": {
+        "n_scored": 3,
+        "n_passed": 3,
+        "n_errored": 0,
+        "n_skipped": 0,
+        "mean_score": 1.0,
+        "pass_rate": 1.0
+      },
+      "Faithfulness": {
+        "n_scored": 3,
+        "n_passed": 3,
+        "n_errored": 0,
+        "n_skipped": 0,
+        "mean_score": 1.0,
+        "pass_rate": 1.0
+      }
+    },
+    "route_confusion": {
+      "answer (expect suggestAnswer) -> suggestAnswer": 3
+    },
+    "slices": {
+      "behaviour:answer": {
+        "passed": 2,
+        "total": 3,
+        "rate": 0.667
+      },
+      "coreference": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "difficulty:easy": {
+        "passed": 2,
+        "total": 3,
+        "rate": 0.667
+      },
+      "ellipsis": {
+        "passed": 0,
+        "total": 1,
+        "rate": 0.0
+      },
+      "single_hop": {
+        "passed": 1,
+        "total": 1,
+        "rate": 1.0
+      },
+      "table_lookup": {
+        "passed": 1,
+        "total": 2,
+        "rate": 0.5
+      }
+    }
+  }
+}

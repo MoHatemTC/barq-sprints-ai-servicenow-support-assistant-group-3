@@ -1,0 +1,96 @@
+{
+  "run_id": "20261001T135441Z",
+  "started_utc": "2026-10-01T13:54:41+00:00",
+  "stages": [
+    "agent"
+  ],
+  "n_turns": 3,
+  "turn_ids": [
+    "S01-T1",
+    "S01-T2",
+    "S01-T3"
+  ],
+  "input_mode": "standalone",
+  "filters": {
+    "ids": null,
+    "sessions": null,
+    "behaviour": null,
+    "slice": null,
+    "limit": 3
+  },
+  "judge_enabled": true,
+  "deepeval_version": "4.2.7",
+  "python": "3.11.9",
+  "agent_model": "gemini/gemini-3.6-flash",
+  "judge_model": "gemini/gemini-3.6-flash",
+  "judge_is_same_as_agent": true,
+  "llm_gateway_host": "https://management.sprints.ai",
+  "agent": {
+    "max_iterations": 5,
+    "temperature": "gateway default (not set in build_llm)",
+    "question_framing": "wrapped as incident, category=inquiry"
+  },
+  "retrieval": {
+    "collection": "kb_articles",
+    "top_k": 5,
+    "embedding_model": "gemini-embedding-2",
+    "embedding_dimension": 3072,
+    "score_threshold": null,
+    "reference_match": "token containment (ref>=0.6 or chunk>=0.8)"
+  },
+  "writeback": "capture-only stub (no ServiceNow calls)",
+  "metrics": {
+    "Faithfulness": {
+      "threshold": 0.8
+    },
+    "AnswerRelevancy": {
+      "threshold": 0.7
+    },
+    "ContextualPrecision": {
+      "threshold": 0.5
+    },
+    "ContextualRecall": {
+      "threshold": 0.5
+    },
+    "Citation": {
+      "threshold": 0.7
+    },
+    "TurnRubric": {
+      "threshold": 0.7
+    },
+    "Hallucination": {
+      "threshold": 0.5
+    },
+    "RefusalQuality": {
+      "threshold": 0.7
+    },
+    "Safety": {
+      "threshold": 0.7
+    }
+  },
+  "metric_policy": "per-turn selection from dataset behaviour/tags/geval_criteria; see evaluation/README.md",
+  "dataset": {
+    "name": "barq-servicedesk-rag-eval",
+    "version": "1.0",
+    "corpus_document": "BARQ_IT_Service_Desk_Manual_Ed5.docx",
+    "corpus_edition_declared": "4.0",
+    "file": "barq_rag_eval_dataset.json",
+    "sha256": "289ccfa42752d50cfd1cdfaf4a5387237f85d3ff78cd28bd5254a145ad9f377c"
+  },
+  "env_var_names_used": [
+    "LLM_API_KEY",
+    "LLM_MODEL",
+    "LLM_BASE_URL",
+    "GEMINI_API_KEY",
+    "QDRANT_URL",
+    "QDRANT_API_KEY",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY"
+  ],
+  "secrets_policy": "values never written; outputs redacted and scanned before exit",
+  "interrupted": false,
+  "n_turns_completed": {
+    "retrieval": 0,
+    "agent": 3
+  }
+}
