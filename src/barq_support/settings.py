@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     llm_api_key: str = Field(default="")
     llm_model: str = Field(default="")
     llm_base_url: str = Field(default="")
+    llm_vision_model: str = Field(default="gemini/gemini-3.6-flash")
     #gemini_api_key: str = Field(default="")
 
     # Ollama password classifier

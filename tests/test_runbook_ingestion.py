@@ -93,6 +93,7 @@ def test_non_pdf_attachment_is_rejected(client, secret):
     assert response.status_code == 422
 
 
+@patch("barq_support.ingestion.runbook_pdf.delete_article_chunks")
 @patch("barq_support.ingestion.runbook_pdf.upsert_chunks")
 @patch("barq_support.ingestion.runbook_pdf.ensure_collection")
 @patch("barq_support.ingestion.runbook_pdf.get_client")
@@ -101,7 +102,7 @@ def test_non_pdf_attachment_is_rejected(client, secret):
     return_value=[[0.1] * 3072, [0.2] * 3072],
 )
 def test_pdf_text_is_extracted_chunked_embedded_and_indexed(
-    mock_embed, mock_get_client, mock_ensure, mock_upsert
+    mock_embed, mock_get_client, mock_ensure, mock_upsert, mock_delete
 ):
     document = fitz.open()
     page = document.new_page()
@@ -123,6 +124,9 @@ def test_pdf_text_is_extracted_chunked_embedded_and_indexed(
     assert result["chunks"] >= 1
     mock_embed.assert_called_once()
     mock_ensure.assert_called_once_with(mock_get_client.return_value)
+    mock_delete.assert_called_once_with(
+        mock_get_client.return_value, f"servicenow-attachment:{'d' * 32}"
+    )
     mock_upsert.assert_called_once()
     chunks = mock_upsert.call_args.args[1]
     assert result["pages"] == 2

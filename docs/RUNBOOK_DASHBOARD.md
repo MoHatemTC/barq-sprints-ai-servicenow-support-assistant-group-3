@@ -1,4 +1,4 @@
-﻿# ServiceNow Runbook Upload Dashboard
+# ServiceNow Runbook Upload Dashboard
 
 This optional integration lets approved support managers upload runbook PDFs to
 a ServiceNow record. ServiceNow stores each file in `sys_attachment`, sends a
@@ -35,10 +35,10 @@ small and lets FastAPI stream the file from the authenticated ServiceNow API.
 2. Set `SERVICENOW_WEBHOOK_SECRET` to the same secret configured in ServiceNow.
    Set `SERVICENOW_ATTACHMENT_MAX_BYTES` to the maximum accepted PDF size in
    bytes (default `26214400`, or 25 MiB).
-3. Keep the app API and Celery worker running, along with Redis, Qdrant, the
-   Gemini embedding configuration, and the local password-classifier service.
-   Runbook chunks use the same password sanitization gate as existing KB/PDF
-   ingestion.
+3. Keep the app API and Celery worker running, along with Redis, Qdrant, and the
+   Gemini embedding/vision configuration. Runbooks are curated technical documentation
+   uploaded by authorized staff and are indexed directly without the incident-level
+   password masking gate (which applies specifically to incident triage).
 4. Configure the public HTTPS URL with the endpoint path shown below. A local
    ServiceNow instance cannot call `localhost`; use a trusted HTTPS tunnel for
    development.
@@ -84,7 +84,7 @@ status messages.
 2. Map the Record Producer variables to matching fields:
    `runbook_title` -> `title`, `runbook_category` -> `category`, and
    `runbook_notes` -> `runbook_notes`; set initial `status` to `Pending`.
-   Keep `ingestion_notes` reserved for backend progress/resultsΓÇöthe worker
+   Keep `ingestion_notes` reserved for backend progress/results—the worker
    updates that field as the status changes. Keep the manager ACLs.
    The backend integration user separately needs read access to `sys_attachment`
    and read/write access to this table through the Table API.
@@ -213,12 +213,14 @@ status messages.
 
 - The configured maximum size defaults to 25 MiB and is enforced while
   downloading, even when ServiceNow omits `Content-Length`.
-- The automatic path in this repository extracts selectable text with
-  PyMuPDF. It does **not** currently run the multimodal/OCR pipeline described
-  in the proposed infrastructure summary. Scanned/image-only PDFs are
-  rejected with a visible Celery task error; OCR/multimodal extraction
-  remains available through the existing manual `scripts/ingest_pdf.py`
-  workflow.
+- The automatic path in this repository extracts runbook content using multimodal
+  vision analysis (Gemini vision) with automatic page orientation correction,
+  structured tables, and Mermaid diagram formatting. If vision processing is
+  unconfigured or encounters an error, it seamlessly falls back to selectable
+  text extraction via PyMuPDF. Scanned or unreadable PDFs with no extractable text
+  and no vision output are rejected with a visible Celery task error.
+- Oversized runbooks exceeding `SERVICENOW_RUNBOOK_MAX_PAGES` (default 100 pages)
+  are rejected before processing to protect worker memory and avoid task timeouts.
 - The current rule runs on attachment insert. To re-index changed content,
   delete the old attachment and upload a new one so ServiceNow creates a new
   attachment sys_id and a new idempotency key.

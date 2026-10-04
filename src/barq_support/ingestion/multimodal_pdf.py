@@ -8,10 +8,10 @@ import io
 import logging
 import os
 import re
+import tempfile
 import time
 from typing import Any
 
-from dotenv import load_dotenv
 import pymupdf as fitz
 import pytesseract
 from PIL import Image
@@ -19,8 +19,7 @@ from openai import OpenAI
 from google.genai.errors import ClientError
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from barq_support.retrieval.embedder import embed_texts, EMBEDDING_BATCH_SIZE
-from barq_support.ingestion.qdrant_store import get_client, ensure_collection, upsert_chunks
+from barq_support.retrieval.embedder import embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,9 @@ def correct_pdf_orientation(pdf_path: str) -> str:
                 pass
 
         if needs_correction:
-            temp_path = f"oriented_temp_{os.path.basename(pdf_path)}"
+            temp_path = os.path.join(
+                tempfile.gettempdir(), f"oriented_temp_{os.path.basename(pdf_path)}"
+            )
             doc.save(temp_path)
             doc.close()
             return temp_path

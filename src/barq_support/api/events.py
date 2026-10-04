@@ -64,7 +64,7 @@ async def receive_servicenow_webhook(
     if not event_id:
         logger.warning("Missing event identifier in webhook payload: %s", payload)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Missing event identifier (incident_sys_id, sys_id, or event_id)",
         )
 
@@ -203,7 +203,7 @@ async def receive_servicenow_attachment(
         not isinstance(runbook_notes, str) or len(runbook_notes) > 500
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="runbook_notes must be a string of at most 500 characters",
         )
 

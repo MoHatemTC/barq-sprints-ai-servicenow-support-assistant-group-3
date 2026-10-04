@@ -20,7 +20,7 @@ from .multimodal_pdf import (
     extract_page_markdown,
     load_pages,
 )
-from .qdrant_store import ensure_collection, get_client, upsert_chunks
+from .qdrant_store import delete_article_chunks, ensure_collection, get_client, upsert_chunks
 from ..settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def ingest_runbook_pdf(
             raise ValueError("PDF contains no readable pages")
 
         vision_client = None
-        vision_model = os.getenv("LLM_VISION_MODEL", "gemini/gemini-3.6-flash")
+        vision_model = settings.llm_vision_model or "gemini/gemini-3.6-flash"
         if settings.llm_api_key:
             try:
                 vision_client = OpenAI(
@@ -123,6 +123,7 @@ def ingest_runbook_pdf(
 
         qdrant = get_client()
         ensure_collection(qdrant)
+        delete_article_chunks(qdrant, article_id)
         upsert_chunks(qdrant, chunks, vectors)
 
         logger.info(
