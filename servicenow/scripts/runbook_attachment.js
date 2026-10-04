@@ -76,9 +76,17 @@
         request.setRequestHeader('Content-Type', 'application/json');
         request.setRequestHeader('X-Signature', signature);
         request.setRequestBody(requestBody);
-        runbook.status = 'Processing';
-        runbook.ingestion_notes = 'PDF notification sent; waiting for backend ingestion.';
-        runbook.update();
+        request.setHttpTimeout(15000);
+
+        // The rule also runs on Update. Do not reset a record the backend has
+        // already moved to Processing/Ingested: the backend de-duplicates repeat
+        // events per attachment and would never correct the status again.
+        var currentStatus = runbook.getValue('status') || '';
+        if (currentStatus !== 'Processing' && currentStatus !== 'Ingested') {
+            runbook.status = 'Processing';
+            runbook.ingestion_notes = 'PDF notification sent; waiting for backend ingestion.';
+            runbook.update();
+        }
 
         var response = request.execute();
         var responseCode = response.getStatusCode();

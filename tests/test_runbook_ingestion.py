@@ -216,3 +216,30 @@ def test_worker_marks_runbook_failed_and_reraises(mock_client_class, mock_ingest
         "Processing",
         "Failed",
     ]
+
+
+@patch("barq_support.ingestion.runbook_pdf.embed_with_retry")
+@patch("barq_support.ingestion.runbook_pdf.get_client")
+def test_pdf_over_page_limit_is_rejected_before_any_processing(
+    mock_get_client, mock_embed
+):
+    document = fitz.open()
+    for _ in range(3):
+        document.new_page()
+    pdf_bytes = document.tobytes()
+
+    settings = get_settings().model_copy(update={"servicenow_runbook_max_pages": 2})
+    with patch("barq_support.ingestion.runbook_pdf.get_settings", return_value=settings):
+        with pytest.raises(ValueError, match="limit is 2"):
+            ingest_runbook_pdf("a" * 32, "big.pdf", pdf_bytes)
+
+    mock_embed.assert_not_called()
+    mock_get_client.assert_not_called()
+
+
+def test_ingest_task_time_limits_stay_below_visibility_timeout():
+    from barq_support.celery_app import celery_app
+
+    visibility = celery_app.conf.broker_transport_options["visibility_timeout"]
+    assert ingest_servicenow_attachment.soft_time_limit < ingest_servicenow_attachment.time_limit
+    assert ingest_servicenow_attachment.time_limit < visibility

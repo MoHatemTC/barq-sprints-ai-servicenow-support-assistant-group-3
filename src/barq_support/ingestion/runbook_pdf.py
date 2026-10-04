@@ -41,6 +41,17 @@ def ingest_runbook_pdf(
         raise ValueError("ServiceNow attachment is not a valid PDF")
 
     settings = get_settings()
+    try:
+        with fitz.open(stream=pdf_bytes, filetype="pdf") as probe:
+            probe_page_count = probe.page_count
+    except Exception as exc:
+        raise ValueError("ServiceNow attachment is not a readable PDF") from exc
+    if probe_page_count > settings.servicenow_runbook_max_pages:
+        raise ValueError(
+            f"PDF has {probe_page_count} pages; the limit is "
+            f"{settings.servicenow_runbook_max_pages}"
+        )
+
     article_id = f"servicenow-attachment:{attachment_sys_id}"
 
     # Write attachment bytes to a temporary file for rendering & vision

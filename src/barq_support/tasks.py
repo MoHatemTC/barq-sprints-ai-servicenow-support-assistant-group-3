@@ -118,7 +118,14 @@ def sync_kb_article(self, event_payload: dict[str, Any]) -> dict[str, Any]:
     return {"status": "success", "operation": operation, **safe_result}
 
 
-@celery_app.task(name="barq_support.tasks.ingest_servicenow_attachment", bind=True)
+@celery_app.task(
+    name="barq_support.tasks.ingest_servicenow_attachment",
+    bind=True,
+    # Must stay below broker_transport_options["visibility_timeout"] (3600 s),
+    # otherwise Redis re-delivers the task while it is still running.
+    soft_time_limit=1800,
+    time_limit=2400,
+)
 def ingest_servicenow_attachment(
     self,
     event_payload: dict[str, Any],

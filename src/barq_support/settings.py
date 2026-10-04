@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     servicenow_password: str = Field(default="")
     servicenow_runbook_table: str = Field(default="x_2215697_ai_ser_0_runbook_upload")
     servicenow_attachment_max_bytes: int = Field(default=25 * 1024 * 1024, gt=0)
+    servicenow_runbook_max_pages: int = Field(default=100, gt=0)
 
     # Qdrant
     qdrant_url: str = Field(default="")

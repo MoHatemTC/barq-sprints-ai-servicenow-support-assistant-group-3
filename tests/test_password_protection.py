@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from barq_support.password_protection import (
+    WITHHELD_PLACEHOLDER,
     classify_password_presence,
     redact_known_patterns,
     sanitize_text_fields,
@@ -113,3 +114,76 @@ def test_process_incident_masks_and_calls_servicenow_redact():
     # Verify agent receives the sanitized description
     agent_incident = mock_run_agent.call_args.kwargs["incident"]
     assert "[REDACTED]" in agent_incident["description"]
+
+
+@pytest.mark.parametrize(
+    "text, leaked",
+    [
+        ("the password for VPN is Hunter22", "Hunter22"),
+        ("password is: Hunter22", "Hunter22"),
+        ('{"password": "Hunter22"}', "Hunter22"),
+        ("pwd=Hunter22", "Hunter22"),
+        ("pass: Hunter22", "Hunter22"),
+        ("passwords: Hunter22", "Hunter22"),
+        ("Authorization: Bearer abc.def.ghi123", "abc.def.ghi123"),
+        ("postgres://user:Hunter22@host/db", "Hunter22"),
+        ("key AKIAIOSFODNN7EXAMPLE", "AKIAIOSFODNN7EXAMPLE"),
+        ("كلمة المرور هي Hunter22", "Hunter22"),
+    ],
+)
+def test_redact_known_patterns_masks_additional_credential_shapes(text, leaked):
+    result = redact_known_patterns(text)
+    assert leaked not in result
+    assert "[REDACTED]" in result
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The password is incorrect",
+        "my password is expired and I cannot log in",
+        "password is not working",
+        "Please pass the test results to the team",
+        "كلمة المرور خاطئة",
+    ],
+)
+def test_ordinary_ticket_text_is_not_rewritten(text):
+    assert redact_known_patterns(text) == text
+
+
+def test_redaction_is_idempotent():
+    once = redact_known_patterns("password: Hunter22")
+    assert redact_known_patterns(once) == once
+
+
+def test_classifier_flag_after_masking_withholds_the_field():
+    settings = Settings(
+        password_classifier_base_url="http://localhost:11434",
+        password_classifier_model="qwen2.5:1.5b",
+    )
+    fields = {
+        "short_description": "Cannot log in",
+        "description": "login with the code kaboom-77 works",
+    }
+    with patch(
+        "barq_support.password_protection.classify_password_presence",
+        side_effect=lambda text, _settings: "kaboom-77" in text,
+    ):
+        result = sanitize_text_fields(fields, settings)
+
+    assert result["short_description"] == "Cannot log in"
+    assert "kaboom-77" not in result["description"]
+    assert result["description"] == WITHHELD_PLACEHOLDER
+
+
+def test_classifier_unavailable_keeps_regex_only_result():
+    settings = Settings(
+        password_classifier_base_url="http://localhost:11434",
+        password_classifier_model="qwen2.5:1.5b",
+    )
+    with patch("httpx.post", side_effect=httpx.ConnectError("refused")):
+        result = sanitize_text_fields(
+            {"description": "password is Hunter22 please help"}, settings
+        )
+    assert "Hunter22" not in result["description"]
+    assert result["description"] != WITHHELD_PLACEHOLDER
