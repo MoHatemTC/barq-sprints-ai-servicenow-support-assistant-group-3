@@ -30,14 +30,17 @@ class S3AgentState(AgentState):
 class ExecutionGuardMiddleware(AgentMiddleware):
     """Enforce the S3.4 agent execution boundary."""
 
-    def __init__(self, max_iterations: int = 5):
+    def __init__(self, max_iterations: int = 5, max_searches: int = 2):
         super().__init__()
 
         if max_iterations < 1:
             raise ValueError("max_iterations must be at least 1")
+        if max_searches < 1:
+            raise ValueError("max_searches must be at least 1")
 
         self.max_iterations = max_iterations
-        self._search_performed = False
+        self.max_searches = max_searches
+        self._search_count = 0
         self._search_lock = Lock()
         
     @hook_config(can_jump_to=["end"])
@@ -47,7 +50,7 @@ class ExecutionGuardMiddleware(AgentMiddleware):
         runtime: Any,
     ) -> dict[str, Any] | None:
         with self._search_lock:
-            self._search_performed = False
+            self._search_count = 0
         return {
             "s3_iterations": 0,
             "s3_terminal_called": False,
@@ -75,7 +78,10 @@ class ExecutionGuardMiddleware(AgentMiddleware):
     }
 
     def wrap_model_call(self, request, handler):
-        if not self._search_performed:
+        with self._search_lock:
+            reached_limit = self._search_count >= self.max_searches
+
+        if not reached_limit:
             return handler(request)
 
         terminal_tools = [
@@ -96,7 +102,8 @@ class ExecutionGuardMiddleware(AgentMiddleware):
         system_message = SystemMessage(
             content=(
                 f"{system_text}\n\n"
-                "Knowledge retrieval is complete. Do not search again. "
+                f"Knowledge retrieval limit reached ({self.max_searches} searches performed). "
+                "Do not search again. "
                 "Use the retrieved evidence already in the conversation and "
                 "call exactly one terminal tool now: suggestAnswer if it "
                 "supports a safe, grounded procedure, otherwise requestHR."
@@ -114,11 +121,11 @@ class ExecutionGuardMiddleware(AgentMiddleware):
 
         if tool_name == "searchKB":
             with self._search_lock:
-                if self._search_performed:
+                if self._search_count >= self.max_searches:
                     raise RuntimeError(
-                        "searchKB may only be called once per incident execution"
+                        f"searchKB may only be called at most {self.max_searches} times per incident execution"
                     )
-                self._search_performed = True
+                self._search_count += 1
 
         result = handler(request)
 

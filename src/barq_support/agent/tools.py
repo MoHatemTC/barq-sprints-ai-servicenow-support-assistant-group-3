@@ -151,8 +151,9 @@ def build_tools(
         func=search_kb_tool,
         name="searchKB",
         description=(
-            "Search the ServiceNow knowledge base once using dense vector "
-            "retrieval. After this search, choose suggestAnswer or requestHR."
+            "Search the ServiceNow knowledge base using dense vector "
+            "retrieval (maximum 2 searches per incident). After retrieving evidence, "
+            "choose suggestAnswer or requestHR."
         ),
         args_schema=SearchKBInput,
     )
