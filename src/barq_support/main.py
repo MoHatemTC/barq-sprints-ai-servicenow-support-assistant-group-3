@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from .api.events import router as events_router
+from .api.events import documents_router, router as events_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,6 +17,7 @@ app = FastAPI(
 )
 
 app.include_router(events_router)
+app.include_router(documents_router)
 
 
 @app.get("/", tags=["health"])

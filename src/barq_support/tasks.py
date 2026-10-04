@@ -6,6 +6,7 @@ from .servicenow import ServiceNowClient
 from .settings import get_settings
 from .worker import process_incident
 from .ingestion.ingest import ingest_article, delete_article
+from .ingestion.runbook_pdf import ingest_runbook_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -115,3 +116,84 @@ def sync_kb_article(self, event_payload: dict[str, Any]) -> dict[str, Any]:
     safe_result = _sanitize_for_json(result)
     logger.info("KB sync finished: %s", safe_result)
     return {"status": "success", "operation": operation, **safe_result}
+
+
+@celery_app.task(
+    name="barq_support.tasks.ingest_servicenow_attachment",
+    bind=True,
+    # Must stay below broker_transport_options["visibility_timeout"] (3600 s),
+    # otherwise Redis re-delivers the task while it is still running.
+    soft_time_limit=1800,
+    time_limit=2400,
+)
+def ingest_servicenow_attachment(
+    self,
+    event_payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Download and index a PDF runbook linked to a ServiceNow attachment."""
+    attachment_sys_id = event_payload.get("attachment_sys_id")
+    file_name = event_payload.get("file_name")
+    runbook_sys_id = event_payload.get("table_sys_id")
+    title = event_payload.get("title", "")
+    category = event_payload.get("category", "")
+    runbook_notes = event_payload.get("runbook_notes", "")
+    if (
+        not isinstance(attachment_sys_id, str)
+        or not isinstance(file_name, str)
+        or not isinstance(runbook_sys_id, str)
+    ):
+        raise ValueError(
+            "Attachment event requires attachment_sys_id, file_name, and table_sys_id"
+        )
+    if not isinstance(title, str):
+        raise ValueError("Attachment event title must be a string")
+    if not isinstance(category, str):
+        raise ValueError("Attachment event category must be a string")
+    if not isinstance(runbook_notes, str):
+        raise ValueError("Attachment event runbook_notes must be a string")
+
+    settings = get_settings()
+    servicenow = ServiceNowClient(settings)
+    try:
+        servicenow.update_runbook_upload(
+            runbook_sys_id,
+            status_value="Processing",
+            notes="Downloading and indexing PDF runbook.",
+        )
+        pdf_bytes = servicenow.download_attachment(
+            attachment_sys_id,
+            max_bytes=settings.servicenow_attachment_max_bytes,
+        )
+        result = ingest_runbook_pdf(
+            attachment_sys_id=attachment_sys_id,
+            file_name=file_name,
+            pdf_bytes=pdf_bytes,
+            title=title,
+            category=category,
+            runbook_notes=runbook_notes,
+        )
+    except Exception as exc:
+        try:
+            servicenow.update_runbook_upload(
+                runbook_sys_id,
+                status_value="Failed",
+                notes=f"Ingestion failed ({type(exc).__name__}). Check backend worker logs.",
+            )
+        except Exception:
+            logger.exception(
+                "Could not mark runbook record %s as Failed",
+                runbook_sys_id,
+            )
+        raise
+
+    servicenow.update_runbook_upload(
+        runbook_sys_id,
+        status_value="Ingested",
+        notes=f"Indexed {result['chunks']} chunks from {result['pages']} PDF pages.",
+    )
+    logger.info("Runbook attachment %s ingested: %s", attachment_sys_id, result)
+    return {
+        "status": "success",
+        "ingestion_status": result["status"],
+        **{key: value for key, value in result.items() if key != "status"},
+    }
