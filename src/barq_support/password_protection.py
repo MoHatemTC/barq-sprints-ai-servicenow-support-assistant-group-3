@@ -9,20 +9,26 @@ from .settings import Settings
 
 logger = logging.getLogger(__name__)
 
-# Credential keywords (singular or plural). "pass" is only matched together with
-# an explicit separator (":" or "=") so ordinary prose such as "pass the test"
-# is left alone.
-_KEYWORDS = (
+# Credential keywords for explicit assignment ("password: X", "pwd=X", "pass: X", "secret=X").
+_ASSIGNMENT_KEYWORDS = (
     r"(?:password|passwd|passcode|passphrase|pwd|pass|secret|token|"
     r"api[\s_-]?key|access[\s_-]?token|client[\s_-]?secret)s?"
 )
 
+# Natural language keywords ("password is X", "temp passcode is X").
+# "pass" and "secret" are omitted here so phrases like "pass for the gym"
+# or "secret is out" are never redacted.
+_NATURAL_KEYWORDS = (
+    r"(?:password|passwd|passcode|passphrase|pwd)s?"
+)
+
 # Words that follow "password is ..." in ordinary support tickets and are not
-# credential values (e.g. "the password is incorrect").
+# credential values (e.g. "the password is incorrect", "password is the same as before").
 _NOT_A_VALUE = (
     r"(?!(?:incorrect|invalid|expired|wrong|required|not|missing|correct|"
     r"locked|blocked|rejected|too|being|working|reset|changed|empty|"
-    r"valid|accepted|failing|failed|disabled|unknown)\b)"
+    r"valid|accepted|failing|failed|disabled|unknown|"
+    r"the|same|a|an|also|now|still|default|different|out|fine|good|needed|set)\b)"
 )
 
 _PASSWORD_CHANGE_PATTERN = re.compile(
@@ -33,7 +39,7 @@ _PASSWORD_CHANGE_PATTERN = re.compile(
 # password: X   pwd=X   "password": "X"   token = 'X'
 _CREDENTIAL_ASSIGNMENT_PATTERN = re.compile(
     rf"""(?ix)
-    (\b{_KEYWORDS}\b["']?\s*[:=]\s*)
+    (\b{_ASSIGNMENT_KEYWORDS}\b["']?\s*[:=]\s*)
     (?:"[^"]*"|'[^']*'|[^\s,;}}]+)
     """
 )
@@ -41,7 +47,7 @@ _CREDENTIAL_ASSIGNMENT_PATTERN = re.compile(
 # "password is X"   "password is: X"   "the password for VPN is X"
 _NATURAL_LANGUAGE_CREDENTIAL_PATTERN = re.compile(
     rf"""(?ix)
-    (\b{_KEYWORDS}\b
+    (\b{_NATURAL_KEYWORDS}\b
     (?:\s+(?:for|of)\s+[\w.-]+(?:\s+[\w.-]+)?)?
     \s+(?:is|are|was)\s*:?\s*)
     {_NOT_A_VALUE}

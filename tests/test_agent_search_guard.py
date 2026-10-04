@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from langchain_core.messages import ToolMessage
+
 from barq_support.agent.middleware import ExecutionGuardMiddleware
 
 
@@ -80,9 +82,11 @@ def test_third_search_is_rejected():
     # 2nd search succeeds
     assert middleware.wrap_tool_call(request, handler) == ["retrieved results"]
 
-    # 3rd search raises RuntimeError
-    with pytest.raises(RuntimeError, match="at most 2 times"):
-        middleware.wrap_tool_call(request, handler)
+    # 3rd search returns error ToolMessage instead of crashing with RuntimeError
+    error_msg = middleware.wrap_tool_call(request, handler)
+    assert isinstance(error_msg, ToolMessage)
+    assert error_msg.status == "error"
+    assert "limit reached" in error_msg.content
 
 
 def test_search_flag_resets_for_each_agent_run():

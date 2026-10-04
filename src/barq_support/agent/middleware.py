@@ -3,7 +3,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Any, NotRequired
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from langgraph.types import Command
 
 from langchain.agents.middleware import AgentMiddleware, AgentState, hook_config
@@ -122,8 +122,15 @@ class ExecutionGuardMiddleware(AgentMiddleware):
         if tool_name == "searchKB":
             with self._search_lock:
                 if self._search_count >= self.max_searches:
-                    raise RuntimeError(
-                        f"searchKB may only be called at most {self.max_searches} times per incident execution"
+                    tool_call = getattr(request, "tool_call", {}) or {}
+                    tool_call_id = tool_call.get("id", "")
+                    return ToolMessage(
+                        content=(
+                            f"searchKB limit reached ({self.max_searches} searches performed). "
+                            "Do not search again. Call suggestAnswer or requestHR."
+                        ),
+                        tool_call_id=tool_call_id,
+                        status="error",
                     )
                 self._search_count += 1
 

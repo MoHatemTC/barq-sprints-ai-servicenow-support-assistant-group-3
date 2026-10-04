@@ -93,6 +93,31 @@ def test_non_pdf_attachment_is_rejected(client, secret):
     assert response.status_code == 422
 
 
+def test_attachment_missing_or_invalid_signature_is_rejected(client, secret):
+    payload = {
+        "attachment_sys_id": "c" * 32,
+        "file_name": "guide.pdf",
+        "table_sys_id": "3" * 32,
+    }
+    body = json.dumps(payload).encode("utf-8")
+
+    # Missing signature header
+    resp_no_sig = client.post(
+        "/api/v1/documents/servicenow-attachment",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp_no_sig.status_code == 401
+
+    # Tampered / invalid signature
+    resp_bad_sig = client.post(
+        "/api/v1/documents/servicenow-attachment",
+        content=body,
+        headers={"Content-Type": "application/json", "X-Signature": "invalid_sig_hex"},
+    )
+    assert resp_bad_sig.status_code == 401
+
+
 @patch("barq_support.ingestion.runbook_pdf.delete_article_chunks")
 @patch("barq_support.ingestion.runbook_pdf.upsert_chunks")
 @patch("barq_support.ingestion.runbook_pdf.ensure_collection")

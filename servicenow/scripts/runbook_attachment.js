@@ -41,6 +41,15 @@
         return;
     }
 
+    var currentStatus = (runbook.getValue('status') || '').toLowerCase();
+    if (currentStatus !== 'pending') {
+        gs.info(
+            '[Runbook ingestion] Skipping attachment ' + attachmentId +
+            '; runbook status is "' + runbook.getValue('status') + '" (expected "Pending").'
+        );
+        return;
+    }
+
     var payload = {
         event_id: 'runbook:' + attachmentId,
         attachment_sys_id: attachmentId,
@@ -78,15 +87,10 @@
         request.setRequestBody(requestBody);
         request.setHttpTimeout(15000);
 
-        // The rule also runs on Update. Do not reset a record the backend has
-        // already moved to Processing/Ingested: the backend de-duplicates repeat
-        // events per attachment and would never correct the status again.
-        var currentStatus = runbook.getValue('status') || '';
-        if (currentStatus !== 'Processing' && currentStatus !== 'Ingested') {
-            runbook.status = 'Processing';
-            runbook.ingestion_notes = 'PDF notification sent; waiting for backend ingestion.';
-            runbook.update();
-        }
+        // Transition the Pending runbook to Processing before dispatching notification
+        runbook.status = 'Processing';
+        runbook.ingestion_notes = 'PDF notification sent; waiting for backend ingestion.';
+        runbook.update();
 
         var response = request.execute();
         var responseCode = response.getStatusCode();

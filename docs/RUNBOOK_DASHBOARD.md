@@ -219,13 +219,18 @@ status messages.
   unconfigured or encounters an error, it seamlessly falls back to selectable
   text extraction via PyMuPDF. Scanned or unreadable PDFs with no extractable text
   and no vision output are rejected with a visible Celery task error.
-- Oversized runbooks exceeding `SERVICENOW_RUNBOOK_MAX_PAGES` (default 100 pages)
+- Oversized runbooks exceeding `SERVICENOW_RUNBOOK_MAX_PAGES` (default 50 pages)
   are rejected before processing to protect worker memory and avoid task timeouts.
-- The current rule runs on attachment insert. To re-index changed content,
-  delete the old attachment and upload a new one so ServiceNow creates a new
-  attachment sys_id and a new idempotency key.
-- Failed background tasks are visible in worker logs and should set the
-  Runbook record to `Failed`. A notification being accepted by FastAPI means
-  it was queued, not that indexing completed.
-- Apply the same access controls and retention policies to the Runbook table
-  and its attachments as to the underlying operational documentation.
+  Furthermore, page vision extraction operates under a time budget (1200 s) before
+  falling back to native PyMuPDF text for remaining pages to ensure tasks stay well
+  below the Celery soft time limit (1800 s).
+- The Business Rule runs on attachment Insert and Update when the record status is
+  `Pending`. To re-index changed or failed content, reset the Runbook status to
+  `Pending` or upload a new attachment.
+- **Trust Boundary**: Runbooks are curated internal IT operational procedures authored
+  and uploaded exclusively by authorized ITIL managers/administrators (`itil_admin`).
+  Because they contain legitimate technical commands, configuration parameters, and
+  topologies, they bypass incident triage password masking and are indexed directly
+  into Qdrant.
+- Failed background tasks are visible in worker logs and set the Runbook record to `Failed`.
+  A notification being accepted by FastAPI means it was queued, not that indexing completed.

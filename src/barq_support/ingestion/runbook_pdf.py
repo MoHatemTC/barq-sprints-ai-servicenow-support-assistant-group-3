@@ -8,6 +8,7 @@ and fallback to native text extraction when vision is unconfigured or unavailabl
 import logging
 import os
 import tempfile
+import time
 from typing import Any
 
 from openai import OpenAI
@@ -24,6 +25,9 @@ from .qdrant_store import delete_article_chunks, ensure_collection, get_client, 
 from ..settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Leave generous margin before Celery soft_time_limit (1800s)
+MAX_VISION_TIME_SECONDS = 1200.0
 
 
 def ingest_runbook_pdf(
@@ -78,19 +82,31 @@ def ingest_runbook_pdf(
             except Exception as exc:
                 logger.warning("Could not initialize vision client: %s; falling back to native text", exc)
 
+        vision_start_time = time.time()
+        vision_budget_exhausted = False
         page_markdowns: list[tuple[int, str]] = []
         for page in pages:
             page_num = page["page_number"]
             markdown = None
 
-            # Attempt vision-based extraction if client available
-            if vision_client:
-                try:
-                    markdown = extract_page_markdown(vision_client, vision_model, page)
-                except Exception as exc:
-                    logger.warning("Vision extraction failed for page %s: %s", page_num, exc)
+            # Attempt vision-based extraction if client available and budget not exhausted
+            if vision_client and not vision_budget_exhausted:
+                if time.time() - vision_start_time > MAX_VISION_TIME_SECONDS:
+                    logger.warning(
+                        "Vision processing time budget (%.0fs) reached at page %d/%d; "
+                        "falling back to native text for remaining pages.",
+                        MAX_VISION_TIME_SECONDS,
+                        page_num,
+                        len(pages),
+                    )
+                    vision_budget_exhausted = True
+                else:
+                    try:
+                        markdown = extract_page_markdown(vision_client, vision_model, page)
+                    except Exception as exc:
+                        logger.warning("Vision extraction failed for page %s: %s", page_num, exc)
 
-            # Fall back to native extracted text if vision extraction yielded nothing
+            # Fall back to native extracted text if vision extraction yielded nothing or budget exceeded
             if not markdown and page.get("native_text"):
                 markdown = page["native_text"]
 
